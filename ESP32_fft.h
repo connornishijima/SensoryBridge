@@ -52,7 +52,7 @@ typedef enum
 class ESP_fft {
 
 public:
-  ESP_fft(int size, int samplefreq,fft_type_t type, fft_direction_t direction, float input[], float output[]);
+  ESP_fft(int size, int samplefreq, fft_type_t type, fft_direction_t direction, float input[], float output[]);
   ~ESP_fft();
 
   void  hammingWindow();

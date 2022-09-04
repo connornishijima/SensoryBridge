@@ -13,6 +13,7 @@ void flip_image();
 void mirror_image_upwards();
 void mirror_image_downwards();
 void fade_edges(uint8_t width);
+void run_warning_led();
 
 void save_leds_to_last() {
   memcpy(leds_last, leds, sizeof(leds));
@@ -36,9 +37,12 @@ void load_leds_from_temp() {
 
 void show_leds(){
 	if(!collecting_ambient_noise){
-		shift_leds_up(LED_OFFSET);
+		//shift_leds_up(LED_OFFSET);
+    run_warning_led();
 		FastLED.show();
 	}
+
+  current_frame++;
 }
 
 
@@ -78,7 +82,7 @@ float truncate_float(float input) {
 void interpolate_scale_leds(float scale) {
   scale = 1.0 / scale; // inverse multiplication of scale (2.0 -> 0.5, 4.0 -> 0.25)
   for (uint16_t i = 0; i < 128; i++) {
-    float index_f = i / 128.0;
+    float index_f = i / 127.0;
     CRGB out_val = lerp_led(index_f * scale, leds);
     leds_temp[i] = out_val;
   }
@@ -103,15 +107,20 @@ CRGB lerp_led(float index, CRGB * led_array) {
   }
   int index_i = (int)index_f;
   float index_f_frac = index_f - index_i;
-  uint8_t r_val = (1 - index_f_frac) * led_array[index_i].r + index_f_frac * led_array[index_i + 1].r;
-  uint8_t g_val = (1 - index_f_frac) * led_array[index_i].g + index_f_frac * led_array[index_i + 1].g;
-  uint8_t b_val = (1 - index_f_frac) * led_array[index_i].b + index_f_frac * led_array[index_i + 1].b;
-  return CRGB(r_val, g_val, b_val);
+  CRGB out_col = CRGB(0,0,0);
+  out_col.r += (1 - index_f_frac) * led_array[index_i].r;
+  out_col.g += (1 - index_f_frac) * led_array[index_i].g;
+  out_col.b += (1 - index_f_frac) * led_array[index_i].b;
+
+  out_col.r += index_f_frac * led_array[index_i + 1].r;
+  out_col.g += index_f_frac * led_array[index_i + 1].g;
+  out_col.b += index_f_frac * led_array[index_i + 1].b;
+  return out_col;
 }
 
 
 void shift_leds_up(uint16_t offset) {
-  for (int16_t i = NUM_LEDS - 1; i > 0; i--) {
+  for (int16_t i = NUM_LEDS - 1; i >= 0; i--) {
     leds_temp[i] = leds[i - offset];
   }
 
@@ -177,7 +186,7 @@ void process_color_push(){
 		}
 		velocity_sum += velocity;
 	}
-	
+
 	float push_velocity = velocity_sum / 128.0;
 	if(push_velocity > 1.0){
 		push_velocity = 1.0;
@@ -190,15 +199,32 @@ void process_color_push(){
 
   push_velocity *= (((1.0-SMOOTHING)*0.75) + 0.25);
 
+  //Serial.println(push_velocity);
+
 	if(push_velocity > hue_push){
 		hue_push = push_velocity;
 	}
 	else{
-		hue_push *= 0.99;
+		hue_push *= 0.98;
 	}
 
 	if (hue_push > 10.0) {
 		hue_push = 10.0;
 	}
+
+ if(hue_push < 0.1){
+   hue_push = 0.1;
+ }
+ 
 	hue -= hue_push;
+}
+
+void run_warning_led(){
+  if(warn == true){
+    leds[NUM_LEDS-1] = CRGB(255,0,0);
+    warn = false;
+  }
+  else{
+    leds[NUM_LEDS-1] = CRGB(0,0,0);    
+  }
 }

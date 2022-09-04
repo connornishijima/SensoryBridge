@@ -1,61 +1,124 @@
 #include <driver/adc.h>
 
-void init_bridge(){
-	Serial.begin(230400);
-	delay(1000);
-	Serial.println("\n\nBOOT");
+void init_bridge() {
+  Serial.begin(500000);
+  delay(500);
+  Serial.println("\n\nBOOT");
 
-	FastLED.addLeds<WS2812B, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-	for (uint16_t i = 0; i < NUM_LEDS; i++) {
-		leds[i] = CRGB(0, 0, 0);
-		last_fft_frame[i] = 0.01;
-	}
-	FastLED.show();
-	delay(500);
+  // Uncomment/edit one of the following lines for your leds arrangement.
+  // ## Clockless types ##
+  FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
+  // FastLED.addLeds<SM16703, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<TM1829, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<TM1812, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<TM1809, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<TM1804, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<TM1803, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<UCS1903, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<UCS1903B, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<UCS1904, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<UCS2903, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<WS2812, LED_DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
+  // FastLED.addLeds<WS2852, LED_DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
+  // FastLED.addLeds<WS2812B, LED_DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
+  // FastLED.addLeds<GS1903, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<SK6812, LED_DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
+  // FastLED.addLeds<SK6822, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<APA106, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<PL9823, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<SK6822, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<WS2811, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<WS2813, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<APA104, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<WS2811_400, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<GE8822, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<GW6205, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<GW6205_400, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<LPD1886, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<LPD1886_8BIT, DATA_PIN, RGB>(leds, NUM_LEDS);
+  // ## Clocked (SPI) types ##
+  // FastLED.addLeds<LPD6803, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
+  // FastLED.addLeds<LPD8806, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
+  // FastLED.addLeds<WS2801, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<WS2803, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<SM16716, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);
+  // FastLED.addLeds<P9813, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
+  // FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
+  // FastLED.addLeds<APA102, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
+  // FastLED.addLeds<SK9822, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
 
-	for (uint16_t i = 0; i < 256; i++) {
-		fft_ambient_noise_sum[i] = 0;
-	}
+  //FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 4000);
 
-	if (!LittleFS.begin(true)) { // Format if failed
-		Serial.println("LittleFS Mount Failed");
-		return;
-	}
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB(0, 0, 0);
+    last_fft_frame[i] = 0.01;
+  }
+  FastLED.show();
+  delay(500);
 
-	load_ambient_noise_calibration();
+  for (uint16_t i = 0; i < 128; i++) {
+    fft_ambient_noise[i] = 0;
+  }
 
-	adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_11db);
-	adc1_config_channel_atten(ADC1_CHANNEL_1, ADC_ATTEN_11db);
+  if (!LittleFS.begin(true)) { // Format if failed
+    Serial.println("LittleFS Mount Failed");
+    return;
+  }
 
-	ledcSetup(0, 500, 12);
-	ledcAttachPin(SWEET_SPOT_LEFT_PIN, 0);
+  load_ambient_noise_calibration();
 
-	ledcSetup(1, 500, 12);
-	ledcAttachPin(SWEET_SPOT_CENTER_PIN, 1);
+  adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_11db);
+  adc1_config_channel_atten(ADC1_CHANNEL_1, ADC_ATTEN_11db);
 
-	ledcSetup(2, 500, 12);
-	ledcAttachPin(SWEET_SPOT_RIGHT_PIN, 2);
+  ledcSetup(0, 500, 12);
+  ledcAttachPin(SWEET_SPOT_LEFT_PIN, 0);
 
-	pinMode(NOISE_CAL_PIN, INPUT_PULLUP);
-	pinMode(MODE_PIN, INPUT_PULLUP);
+  ledcSetup(1, 500, 12);
+  ledcAttachPin(SWEET_SPOT_CENTER_PIN, 1);
 
-	INIT_I2S();
+  ledcSetup(2, 500, 12);
+  ledcAttachPin(SWEET_SPOT_RIGHT_PIN, 2);
+
+  pinMode(NOISE_CAL_PIN, INPUT_PULLUP);
+  pinMode(MODE_PIN, INPUT_PULLUP);
+
+  INIT_I2S();
 }
 
-void log_fps(){
-	static uint32_t last_call = micros();
-	uint32_t t_now = micros();
-	
-	uint32_t t_delta = t_now - last_call;
-	float FPS = 1000000.0 / float(t_delta);
-	
-	Serial.print("FPS: ");
-	Serial.println(FPS);
-	
-	last_call = t_now;
+void log_fps() {
+  static uint32_t last_call = micros();
+  uint32_t t_now = micros();
+
+  uint32_t t_delta = t_now - last_call;
+  FPS = 1000000.0 / float(t_delta);
+
+  Serial.print("FPS: ");
+  Serial.println(FPS);
+
+  last_call = t_now;
+}
+
+void check_freeze(){
+  if (digitalRead(NOISE_CAL_PIN) == LOW) {
+    while (digitalRead(NOISE_CAL_PIN) == LOW) {
+      yield();
+    }
+    bool frozen = true;
+    while(frozen){
+      if (digitalRead(NOISE_CAL_PIN) == LOW) {
+        frozen = false;
+      }
+      yield();
+    }
+  }
 }
 
 void check_buttons() {
+  #define FREEZE_FRAME true
+  #ifdef FREEZE_FRAME
+    check_freeze();
+  #endif
+  
   // NOISE CAL ------------------------------------------
   bool noise_cal_reset = false;
   if (digitalRead(NOISE_CAL_PIN) == LOW) {
@@ -73,15 +136,15 @@ void check_buttons() {
       Serial.println("COLLECTING AMBIENT NOISE SAMPLES IN 500 MS");
       collecting_ambient_noise = true;
       ambient_noise_samples_collected = 0;
-      for (uint16_t i = 0; i < 256; i++) {
-        fft_ambient_noise_sum[i] = 0;
+      for (uint16_t i = 0; i < 128; i++) {
+        fft_ambient_noise[i] = 0;
       }
 
       delay(500);
     }
     else { // Noise cal reset
-      for (uint16_t i = 0; i < 256; i++) {
-        fft_ambient_noise_sum[i] = 0;
+      for (uint16_t i = 0; i < 128; i++) {
+        fft_ambient_noise[i] = 0;
       }
       save_ambient_noise_calibration();
       Serial.println("CLEARED AMBIENT NOISE CALIBRATION!");
@@ -93,121 +156,137 @@ void check_buttons() {
   }
 
   // MODE SELECT ----------------------------------------
-  if(digitalRead(MODE_PIN) == LOW){
-    
-	LIGHTSHOW_MODE++;
-	if(LIGHTSHOW_MODE >= NUM_MODES){
-		LIGHTSHOW_MODE = 0;
-	}
-	
-	//clear_all_led_buffers();
-	
-    while(digitalRead(MODE_PIN) == LOW){
+  bool mode_pressed = false;
+  bool mode_long_press = false;
+  if (digitalRead(MODE_PIN) == LOW) {
+    mode_pressed = true;
+    uint32_t t_start = millis();
+    while (digitalRead(MODE_PIN) == LOW) {
       yield();
     }
+    uint32_t t_end = millis();
+    if((t_end-t_start) >= 250){
+      mode_long_press = true;
+    }
+  }
+
+  if(mode_pressed && !mode_long_press){
+    LIGHTSHOW_MODE++;
+    if (LIGHTSHOW_MODE >= NUM_MODES) {
+      LIGHTSHOW_MODE = 0;
+    }
+  }
+  else if(mode_pressed && mode_long_press){
+    incandescent_mode = !incandescent_mode;
   }
 }
 
 void check_knobs() {
-	static uint32_t iter = 0;
-	const uint8_t averaging_steps  = 4;
-	static float  last_brightness  = 0.0;
-	static float  last_smoothing   = 1.0;
-	static float  last_sensitivity = 0.0;
-	
-	iter++;
-	
-	if(iter % 5 == 0){
-		float brightness_sum = 0;
-		for (uint8_t i = 0; i < averaging_steps; i++) {
-			brightness_sum += (analogRead(PHOTONS_PIN) / 8191.0);
-		}
-		BRIGHTNESS = (brightness_sum / float(averaging_steps)) * 1.25;
+  static uint32_t iter = 0;
+  const uint8_t averaging_steps  = 4;
+  static float  last_brightness  = 0.0;
+  static float  last_smoothing   = 1.0;
+  static float  last_sensitivity = 0.0;
 
-		float smoothing_sum = 0;
-		for (uint8_t i = 0; i < averaging_steps; i++) {
-			smoothing_sum += (1.0-(analogRead(MOOD_PIN) / 8191.0));
-		}
-		SMOOTHING = smoothing_sum / float(averaging_steps);
+  iter++;
 
-		float sensitivity_sum = 0;
-		for (uint8_t i = 0; i < averaging_steps; i++) {
-			sensitivity_sum += (analogRead(BOOST_PIN) / 8191.0);
-		}
-		float SENSITIVITY = sensitivity_sum / float(averaging_steps);
+  if (iter % 10 == 0) {
+    float brightness_sum = 0;
+    for (uint8_t i = 0; i < averaging_steps; i++) {
+      brightness_sum += (analogRead(PHOTONS_PIN) / 8191.0);
+    }
+    BRIGHTNESS = (1.0 - brightness_sum / float(averaging_steps)) * 1.25;
 
-		if (BRIGHTNESS < 0.0) {
-			BRIGHTNESS = 0.0;
-		}
-		else if (BRIGHTNESS > 1.0) {
-			BRIGHTNESS = 1.0;
-		}
+    float smoothing_sum = 0;
+    for (uint8_t i = 0; i < averaging_steps; i++) {
+      smoothing_sum += (1.0 - (analogRead(MOOD_PIN) / 8191.0));
+    }
+    SMOOTHING = 1.0 - smoothing_sum / float(averaging_steps);
 
-		BRIGHTNESS = BRIGHTNESS * BRIGHTNESS;
+    float sensitivity_sum = 0;
+    for (uint8_t i = 0; i < averaging_steps; i++) {
+      sensitivity_sum += (analogRead(BOOST_PIN) / 8191.0);
+    }
+    float SENSITIVITY = sensitivity_sum / float(averaging_steps);
 
-		BRIGHTNESS = (last_brightness * 0.9) + (BRIGHTNESS * 0.1);
-		last_brightness = BRIGHTNESS;
+    if (BRIGHTNESS < 0.0) {
+      BRIGHTNESS = 0.0;
+    }
+    else if (BRIGHTNESS > 1.0) {
+      BRIGHTNESS = 1.0;
+    }
 
-		SMOOTHING = (last_smoothing * 0.9) + (SMOOTHING * 0.1);
-		last_smoothing = SMOOTHING;
+    BRIGHTNESS = BRIGHTNESS * BRIGHTNESS;
 
-		SENSITIVITY = (last_sensitivity * 0.9) + (SENSITIVITY * 0.1);
-		last_sensitivity = SENSITIVITY;
+    BRIGHTNESS = (last_brightness * 0.75) + (BRIGHTNESS * 0.25);
+    last_brightness = BRIGHTNESS;
 
-		SENSITIVITY = 1.0 - SENSITIVITY;
+    SMOOTHING = (last_smoothing * 0.9) + (SMOOTHING * 0.1);
+    last_smoothing = SMOOTHING;
 
-		float smooth_low  = 0.570;
-		float smooth_high = 0.900;
+    SENSITIVITY = (last_sensitivity * 0.9) + (SENSITIVITY * 0.1);
+    last_sensitivity = SENSITIVITY;
 
-		SMOOTHING = (SMOOTHING) * (smooth_high - smooth_low) / (1.0) + smooth_low;
+    //SENSITIVITY = 1.0 - SENSITIVITY;
 
-		float sensitivity_low  = 11000.0;
-		float sensitivity_high = 395000.0;
+    float smooth_low  = 0.700;
+    float smooth_high = 0.950;
 
-		FFT_CEILING = (SENSITIVITY) * (sensitivity_high - sensitivity_low) / (1.0) + sensitivity_low;
-		//Serial.println(FFT_CEILING);
+    SMOOTHING = (SMOOTHING) * (smooth_high - smooth_low) / (1.0) + smooth_low;
 
-		FastLED.setBrightness(uint8_t(BRIGHTNESS * 255));
-	}
-	/*
-	Serial.print(BRIGHTNESS,6);
-	Serial.print("\t");
-	Serial.println(SMOOTHING,6);
-	*/
+    float sensitivity_low  = 327.67;
+    float sensitivity_high = 32767;
+
+    FFT_CEILING = (SENSITIVITY) * (sensitivity_high - sensitivity_low) / (1.0) + sensitivity_low;
+    //Serial.println(FFT_CEILING);
+
+    FastLED.setBrightness(uint8_t(BRIGHTNESS * 255));
+  }
+  /*
+    Serial.print(BRIGHTNESS,6);
+    Serial.print("\t");
+    Serial.println(SMOOTHING,6);
+  */
 }
 
 void check_sweet_spot() {
+  //Serial.println(multiplier_sum);
   float sweet_spot_down   = 0.0;
   float sweet_spot_center = 0.0;
   float sweet_spot_up     = 0.0;
 
-  sweet_spot_down = fabs(0.75 - multiplier_sum);
-  if (sweet_spot_down > 0.25) {
-    sweet_spot_down = 0.25;
+  sweet_spot_down = fabs((SWEET_SPOT+0.12) - multiplier_sum);
+  if (sweet_spot_down > 0.125) {
+    sweet_spot_down = 0.125;
   }
-  sweet_spot_down *= 4.0;
+  sweet_spot_down *= 8.0;
   sweet_spot_down = 1.0 - sweet_spot_down;
   sweet_spot_down = sweet_spot_down * sweet_spot_down;
 
-  sweet_spot_center = fabs(0.50 - multiplier_sum);
-  if (sweet_spot_center > 0.25) {
-    sweet_spot_center = 0.25;
+  sweet_spot_center = fabs(SWEET_SPOT - multiplier_sum);
+  if (sweet_spot_center > 0.125) {
+    sweet_spot_center = 0.125;
   }
-  sweet_spot_center *= 4.0;
+  sweet_spot_center *= 8.0;
   sweet_spot_center = 1.0 - sweet_spot_center;
   sweet_spot_center = sweet_spot_center * sweet_spot_center;
 
-  sweet_spot_up = fabs(0.25 - multiplier_sum);
-  if (sweet_spot_up > 0.25) {
-    sweet_spot_up = 0.25;
+  sweet_spot_up = fabs((SWEET_SPOT-0.2) - multiplier_sum);
+  if (sweet_spot_up > 0.125) {
+    sweet_spot_up = 0.125;
   }
-  sweet_spot_up *= 4.0;
+  sweet_spot_up *= 8.0;
   sweet_spot_up = 1.0 - sweet_spot_up;
   sweet_spot_up = sweet_spot_up * sweet_spot_up;
 
-  ledcWrite(0, sweet_spot_down   * 1024.0);
-  ledcWrite(1, sweet_spot_center * 1024.0);
-  ledcWrite(2, sweet_spot_up     * 1024.0);
+  float temp_brightness = 1.0;
+  if (BRIGHTNESS < 0.125) {
+    temp_brightness = BRIGHTNESS / 0.125;
+  }
+
+  ledcWrite(0, sweet_spot_down   * 1024.0 * temp_brightness);
+  ledcWrite(1, sweet_spot_center * 1024.0 * temp_brightness);
+  ledcWrite(2, sweet_spot_up     * 1024.0 * temp_brightness);
 }
 
 void check_serial() {
@@ -225,15 +304,15 @@ void check_serial() {
         Serial.println("COLLECTING AMBIENT NOISE SAMPLES IN 1000 MS");
         collecting_ambient_noise = true;
         ambient_noise_samples_collected = 0;
-        for (uint16_t i = 0; i < 256; i++) {
-          fft_ambient_noise_sum[i] = 0;
+        for (uint16_t i = 0; i < 128; i++) {
+          fft_ambient_noise[i] = 0;
         }
 
         delay(1000);
       }
       else if (strcmp(command_buf, "NOISE_CAL_RESET") == 0) {
-        for (uint16_t i = 0; i < 256; i++) {
-          fft_ambient_noise_sum[i] = 0;
+        for (uint16_t i = 0; i < 128; i++) {
+          fft_ambient_noise[i] = 0;
         }
         save_ambient_noise_calibration();
         Serial.println("CLEARED AMBIENT NOISE CALIBRATION!");
@@ -245,4 +324,31 @@ void check_serial() {
       command_buf_index = 0;
     }
   }
+}
+
+void start_timing(String section_name){
+  #ifdef LOG_TIMING
+  if(section_start != 0 || section_end != 0){
+    section_end = micros();
+    Serial.print(current_section);
+    Serial.print(": ");
+    Serial.print(section_end-section_start);
+    Serial.println("us");    
+  }
+  current_section = section_name;
+  section_start = micros();
+  #endif
+}
+
+void end_timing(){
+  #ifdef LOG_TIMING
+  section_end = micros();
+  Serial.print(current_section);
+  Serial.print(": ");
+  Serial.print(section_end-section_start);
+  Serial.println("us");
+
+  section_start = 0;
+  section_end   = 0;
+  #endif
 }

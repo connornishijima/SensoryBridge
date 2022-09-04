@@ -77,7 +77,7 @@ ESP_fft::ESP_fft(int size, int samplefreq,fft_type_t type, fft_direction_t direc
 
   for (int k = 0, m = 0 ; k < _size ; k++, m+=2)
   {
-    _twiddle_factors[m] = cosf(twoPI_by_n * k);    // real
+    _twiddle_factors[m]   = cosf(twoPI_by_n * k);  // real
     _twiddle_factors[m+1] = sinf(twoPI_by_n * k);  // imag
   }
   
@@ -140,6 +140,7 @@ void ESP_fft::hammingWindow() {
     float ratio = (indexMinusOne / samplesMinusOne);
 	
     float weighingFactor = 0.54 - (0.46 * cos(TWOPI * ratio));
+    //float weighingFactor = 0.35875 - (0.48829 * (cos(TWOPI * ratio))) + (0.14128 * (cos(FOURPI * ratio))) - (0.01168 * (cos(SIXPI * ratio)));
 	
     _input[i] *= weighingFactor;
     _input[_size - (i + 1)] *= weighingFactor;
@@ -149,8 +150,7 @@ void ESP_fft::hammingWindow() {
 
 // execute
 //
-void ESP_fft::execute()
-{
+void ESP_fft::execute() {
 
   if (_type == FFT_REAL) {
       if (_direction == FFT_FORWARD)  

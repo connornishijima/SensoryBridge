@@ -1,10 +1,11 @@
-#define SAMPLE_RATE  15000
+#define SAMPLE_RATE  18750
 #define BUFFER_SIZE  256
 #define I2S_PORT     I2S_NUM_0
 
-#define FFT_HISTORY_LEN            8
-#define MULTIPLIER_HISTORY_LENGTH  12
-#define AMBIENT_NOISE_SAMPLES      64
+#define FFT_HISTORY_LEN            6
+#define AMBIENT_NOISE_SAMPLES      128
+
+#define SWEET_SPOT   0.25F
 
 #define PHOTONS_PIN  1
 #define BOOST_PIN    2
