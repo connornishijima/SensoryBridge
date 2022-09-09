@@ -41,7 +41,7 @@ void duet_mode(bool invert_brightness, bool incandescent) {
       final_val = 255.0;
     }
 
-    uint8_t smooth_threshold = 100 - (100 * SMOOTHING);
+    uint8_t smooth_threshold = 75 - (75 * SMOOTHING);
     if (abs(final_val - last_fft_frame[i]) > smooth_threshold) {
       if (final_val > last_fft_frame[i]) {
         float new_val = final_val;
@@ -274,7 +274,7 @@ float velocity_mode(bool run_leds) {
 
   if (fft_vel_sum_history_index >= 360) {
     fft_vel_sum_history_index = 0;
-    autocorrelate_bpm();
+    //autocorrelate_bpm();
   }
   else {
     if (run_leds) {

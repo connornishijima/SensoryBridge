@@ -59,3 +59,5 @@ uint32_t section_start = 0;
 uint32_t section_end   = 0;
 
 bool warn = false;
+
+bool debug_mode = false;

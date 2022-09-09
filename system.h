@@ -1,9 +1,69 @@
 #include <driver/adc.h>
 
+void print_system_info(){
+  Serial.print("\n\n\n");
+
+  Serial.println("--------------------------");
+  Serial.println("* SENSORY BRIDGE *");
+  Serial.println("--------------------------");
+  
+  Serial.print("FIRMWARE VERSION: ");
+  Serial.println(FIRMWARE_VERSION);
+
+  Serial.println("--------------------------");
+
+  Serial.println("Welcome to Sensory Bridge!");
+  Serial.println("By holding down the MODE button on boot,");
+  Serial.println("you've now enabled debug mode.");
+  Serial.println();
+  Serial.println("Currently, this has no effect other than");
+  Serial.println("to print the firmware version number and");
+  Serial.println("FPS value.");
+  Serial.println();
+  Serial.println("(Press MODE again to continue booting!)");
+
+  Serial.flush();
+}
+
+void init_serial(uint32_t baud_rate){
+  Serial.begin(baud_rate);
+  bool timeout = false;
+  uint32_t t_start = millis();
+  uint32_t t_timeout = t_start + 250;
+
+  while(!Serial && timeout == false){
+    if(millis() >= t_timeout){
+      timeout = true; // Must not be connected to PC
+      break;
+    }
+    else{
+      yield();
+    }
+  }
+}
+
 void init_bridge() {
-  Serial.begin(500000);
-  delay(500);
-  Serial.println("\n\nBOOT");
+  pinMode(NOISE_CAL_PIN, INPUT_PULLUP);
+  pinMode(MODE_PIN, INPUT_PULLUP);
+
+  init_serial(500000);
+
+  if(digitalRead(MODE_PIN) == LOW){
+    while(digitalRead(MODE_PIN) == LOW){
+      yield();
+    }
+    debug_mode = true;
+    print_system_info();
+
+    while(digitalRead(MODE_PIN) == HIGH){ // Wait on second MODE press
+      yield();
+    }
+  }
+  else{
+    Serial.print("SBFV: ");
+    Serial.println(FIRMWARE_VERSION);
+    Serial.flush();
+  }
 
   // Uncomment/edit one of the following lines for your leds arrangement.
   // ## Clockless types ##
@@ -61,7 +121,9 @@ void init_bridge() {
   }
 
   if (!LittleFS.begin(true)) { // Format if failed
-    Serial.println("LittleFS Mount Failed");
+    if(debug_mode){
+      Serial.println("LittleFS Mount Failed");
+    }
     return;
   }
 
@@ -79,9 +141,6 @@ void init_bridge() {
   ledcSetup(2, 500, 12);
   ledcAttachPin(SWEET_SPOT_RIGHT_PIN, 2);
 
-  pinMode(NOISE_CAL_PIN, INPUT_PULLUP);
-  pinMode(MODE_PIN, INPUT_PULLUP);
-
   INIT_I2S();
 }
 
@@ -98,27 +157,7 @@ void log_fps() {
   last_call = t_now;
 }
 
-void check_freeze(){
-  if (digitalRead(NOISE_CAL_PIN) == LOW) {
-    while (digitalRead(NOISE_CAL_PIN) == LOW) {
-      yield();
-    }
-    bool frozen = true;
-    while(frozen){
-      if (digitalRead(NOISE_CAL_PIN) == LOW) {
-        frozen = false;
-      }
-      yield();
-    }
-  }
-}
-
 void check_buttons() {
-  #define FREEZE_FRAME true
-  #ifdef FREEZE_FRAME
-    check_freeze();
-  #endif
-  
   // NOISE CAL ------------------------------------------
   bool noise_cal_reset = false;
   if (digitalRead(NOISE_CAL_PIN) == LOW) {
@@ -133,7 +172,9 @@ void check_buttons() {
     }
 
     if (!noise_cal_reset) {
-      Serial.println("COLLECTING AMBIENT NOISE SAMPLES IN 500 MS");
+      if(debug_mode){
+        Serial.println("COLLECTING AMBIENT NOISE SAMPLES IN 500 MS");
+      }
       collecting_ambient_noise = true;
       ambient_noise_samples_collected = 0;
       for (uint16_t i = 0; i < 128; i++) {
@@ -147,7 +188,9 @@ void check_buttons() {
         fft_ambient_noise[i] = 0;
       }
       save_ambient_noise_calibration();
-      Serial.println("CLEARED AMBIENT NOISE CALIBRATION!");
+      if(debug_mode){
+        Serial.println("CLEARED AMBIENT NOISE CALIBRATION!");
+      }
     }
 
     while (digitalRead(NOISE_CAL_PIN) == LOW) {
@@ -255,7 +298,7 @@ void check_sweet_spot() {
   float sweet_spot_center = 0.0;
   float sweet_spot_up     = 0.0;
 
-  sweet_spot_down = fabs((SWEET_SPOT+0.12) - multiplier_sum);
+  sweet_spot_down = fabs((SWEET_SPOT+0.2) - multiplier_sum);
   if (sweet_spot_down > 0.125) {
     sweet_spot_down = 0.125;
   }
@@ -279,14 +322,23 @@ void check_sweet_spot() {
   sweet_spot_up = 1.0 - sweet_spot_up;
   sweet_spot_up = sweet_spot_up * sweet_spot_up;
 
-  float temp_brightness = 1.0;
-  if (BRIGHTNESS < 0.125) {
-    temp_brightness = BRIGHTNESS / 0.125;
+  sweet_spot_down   = int16_t(sweet_spot_down   * 2048);
+  sweet_spot_center = int16_t(sweet_spot_center * 1024); // dimmer than others to appear same brightness with different LED type
+  sweet_spot_up     = int16_t(sweet_spot_up     * 2048);
+
+  if(sweet_spot_down < 10){
+    sweet_spot_down = 10;
+  }
+  if(sweet_spot_center < 10){
+    sweet_spot_center = 10;
+  }
+  if(sweet_spot_up < 10){
+    sweet_spot_up = 10;
   }
 
-  ledcWrite(0, sweet_spot_down   * 1024.0 * temp_brightness);
-  ledcWrite(1, sweet_spot_center * 1024.0 * temp_brightness);
-  ledcWrite(2, sweet_spot_up     * 1024.0 * temp_brightness);
+  ledcWrite(0, sweet_spot_down  );
+  ledcWrite(1, sweet_spot_center);
+  ledcWrite(2, sweet_spot_up    );
 }
 
 void check_serial() {
@@ -316,6 +368,10 @@ void check_serial() {
         }
         save_ambient_noise_calibration();
         Serial.println("CLEARED AMBIENT NOISE CALIBRATION!");
+      }
+      else if (strcmp(command_buf, "FIRMWARE_VERSION") == 0) {
+        Serial.print("#SBFWV|");
+        Serial.println(FIRMWARE_VERSION);
       }
     }
 

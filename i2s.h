@@ -22,7 +22,9 @@ const i2s_pin_config_t pin_config = {
 void INIT_I2S() {
   esp_err_t err = i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
   if (err != ESP_OK) {
-    Serial.printf("Failed installing driver: %d\n", err);
+    if(debug_mode){
+      Serial.printf("Failed installing driver: %d\n", err);
+    }
     while (true) {}
   }
 
@@ -31,10 +33,14 @@ void INIT_I2S() {
 
   err = i2s_set_pin(I2S_PORT, &pin_config);
   if (err != ESP_OK) {
-    Serial.printf("Failed setting pin: %d\n", err);
+    if(debug_mode){
+      Serial.printf("Failed setting pin: %d\n", err);
+    }
     while (true) {}
   }
-  Serial.println("I2S driver installed.");
+  if(debug_mode){
+    Serial.println("I2S driver installed.");
+  }
 }
 
 void capture_audio() {

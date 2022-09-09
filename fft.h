@@ -36,11 +36,12 @@ void process_fft() {
   start_timing("MAGNITUDE");
   FFT.complexToMagnitude();
 
-  for (uint16_t i = 0; i < 128; i++) {
-    fft_integer[i] = fft_output[i + 6];
-    //int16_t fft_gamma = int32_t(fft_integer[i] * fft_integer[i]) >> 15;
-    //int32_t fft_mix = (fft_integer[i] + fft_gamma) / 2;
-    //fft_integer[i] = fft_mix;
+  for (uint16_t i = 0; i < 122; i++) {
+    fft_integer[i] = fft_output[i + 6]; // ignore first 6 bins
+  }
+
+  for (uint16_t i = 122; i < 128; i++) { // Fix 6 empty values at top
+    fft_integer[i] = fft_output[121];
   }
 
   if (collecting_ambient_noise) { // If NOISE_CAL happening now
@@ -99,14 +100,8 @@ void process_fft() {
     multiplier = 0.0;
   }
 
-  if (multiplier < multiplier_last) {
-    multiplier_smoothed = (multiplier * 0.025) + (multiplier_last * 0.975); // follow peaks UP faster than DOWN
-  }
-  else {
-    multiplier_smoothed = (multiplier * 0.025) + (multiplier_last * 0.975); // follow peaks UP faster than DOWN
-    //multiplier_smoothed = (multiplier * 0.0125) + (multiplier_last * 0.9875);
-  }
-
+  multiplier_smoothed = (multiplier * 0.0125) + (multiplier_last * 0.9875); // follow peaks UP faster than DOWN
+  
   multiplier_last = multiplier_smoothed;
 
   start_timing("OUTPUT WITH MULTIPLIER");
@@ -130,15 +125,21 @@ void process_fft() {
       fft_velocities[i] = 0.0;
     }
 
-    past_index = fft_history_index - 2;
-    while (past_index < 0) {
-      past_index += FFT_HISTORY_LEN;
+    int16_t past_index_a = fft_history_index - 2;
+    while (past_index_a < 0) {
+      past_index_a += FFT_HISTORY_LEN;
+    }
+
+    int16_t past_index_b = fft_history_index - 3;
+    while (past_index_b < 0) {
+      past_index_b += FFT_HISTORY_LEN;
     }
 
     int32_t sum = 0;
     sum += final_fft[fft_history_index][i];
-    sum += final_fft[past_index][i];
-    sum = sum >> 1;
+    sum += final_fft[past_index_a][i];
+    sum += final_fft[past_index_b][i];
+    sum = sum / 3;
 
     processed_fft[i] = sum / float(FFT_CEILING);
 
@@ -151,7 +152,7 @@ void process_fft() {
   }
   // Repeat 127 more times
 
-  multiplier_sum = multiplier_smoothed; //[0] + multipliers_smoothed[1] + multipliers_smoothed[2] + multipliers_smoothed[3] + multipliers_smoothed[4] + multipliers_smoothed[5]) / 6.0) * 0.04 + (multiplier_sum * 0.96);
+  multiplier_sum = multiplier_smoothed;
 
   end_timing();
 }

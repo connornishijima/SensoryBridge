@@ -32,10 +32,14 @@ void show_progress_bar(float progress, CRGB col) {
 }
 
 void load_ambient_noise_calibration() {
-  Serial.println("LOADING AMBIENT_NOISE PROFILE...");
+  if(debug_mode){
+    Serial.println("LOADING AMBIENT_NOISE PROFILE...");
+  }
   File file = LittleFS.open("/noise_cal.bin", FILE_READ);
   if (!file) {
-    Serial.println("- failed to open file for reading");
+    if(debug_mode){
+      Serial.println("- failed to open file for reading");
+    }
     return;
   }
 
@@ -48,26 +52,34 @@ void load_ambient_noise_calibration() {
     temp.bytes[2] = file.read();
     temp.bytes[3] = file.read();
 
-    if (i < 8) {
-      print_bits(temp.bytes[0]);
-      print_bits(temp.bytes[1]);
-      print_bits(temp.bytes[2]);
-      print_bits(temp.bytes[3]);
-      Serial.println();
+    if(debug_mode){
+      if (i < 8) {
+        print_bits(temp.bytes[0]);
+        print_bits(temp.bytes[1]);
+        print_bits(temp.bytes[2]);
+        print_bits(temp.bytes[3]);
+        Serial.println();
+      }
     }
 
     fft_ambient_noise[i] = temp.long_val;
   }
 
   file.close();
-  Serial.println("LOAD COMPLETE");
+  if(debug_mode){
+    Serial.println("LOAD COMPLETE");
+  }
 }
 
 void save_ambient_noise_calibration() {
-  Serial.println("SAVING AMBIENT_NOISE PROFILE...");
+  if(debug_mode){
+    Serial.println("SAVING AMBIENT_NOISE PROFILE...");
+  }
   File file = LittleFS.open("/noise_cal.bin", FILE_WRITE);
   if (!file) {
-    Serial.println("- failed to open file for writing");
+    if(debug_mode){
+      Serial.println("- failed to open file for writing");
+    }
     return;
   }
 
@@ -84,17 +96,21 @@ void save_ambient_noise_calibration() {
     file.write( temp.bytes[2] );
     file.write( temp.bytes[3] );
 
-    if (i < 8) {
-      print_bits(temp.bytes[0]);
-      print_bits(temp.bytes[1]);
-      print_bits(temp.bytes[2]);
-      print_bits(temp.bytes[3]);
-      Serial.println();
+    if(debug_mode){
+      if (i < 8) {
+        print_bits(temp.bytes[0]);
+        print_bits(temp.bytes[1]);
+        print_bits(temp.bytes[2]);
+        print_bits(temp.bytes[3]);
+        Serial.println();
+      }
     }
   }
 
   file.close();
-  Serial.println("SAVE COMPLETE");
+  if(debug_mode){
+    Serial.println("SAVE COMPLETE");
+  }
 }
 
 void run_ambient_noise_calibration() {
@@ -111,7 +127,9 @@ void run_ambient_noise_calibration() {
   }
   else if (ambient_noise_samples_collected >= AMBIENT_NOISE_SAMPLES) {
     collecting_ambient_noise = false;
-    Serial.println("AMBIENT NOISE COLLECTION COMPLETE.");
+    if(debug_mode){
+      Serial.println("AMBIENT NOISE COLLECTION COMPLETE.");
+    }
     for (uint16_t i = 1; i < 128; i++) {
       fft_ambient_noise[i]; // Cover existing noise with 2x compensation to account for variations
     }

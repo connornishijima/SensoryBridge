@@ -1,3 +1,5 @@
+#define FIRMWARE_VERSION "1.0.0"
+
 #include <FastLED.h>
 #include <FS.h>
 #include <LittleFS.h>
@@ -22,9 +24,7 @@ enum lightshow_modes {
 #include "noise_cal.h"
 #include "i2s.h"
 #include "system.h"
-#include "fft_fixed.h"
 #include "fft.h"
-#include "bpm.h"
 #include "led_utilities.h"
 #include "lightshow_modes.h"
 
@@ -83,5 +83,7 @@ void loop() {
   }
 
   show_leds();
-  log_fps();
+  if(debug_mode){
+    log_fps();
+  }
 }

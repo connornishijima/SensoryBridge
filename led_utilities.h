@@ -181,7 +181,7 @@ void process_color_push(){
 	float velocity_sum = 0.0;
 	for(uint16_t i = 0; i < 128; i++){
 		float velocity = fft_velocities[i];
-		if(velocity < 0.25){
+		if(velocity < 0.20){
 			velocity = 0.0;
 		}
 		velocity_sum += velocity;
