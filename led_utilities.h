@@ -35,12 +35,21 @@ void load_leds_from_temp() {
 }
 
 
-void show_leds(){
-	if(!collecting_ambient_noise){
-		//shift_leds_up(LED_OFFSET);
+void show_leds() {
+  if (debug_mode) {
     run_warning_led();
-		FastLED.show();
-	}
+  }
+
+  if (STRIP_LED_COUNT == 128) {
+    memcpy(leds_out, leds, sizeof(leds));
+  }
+  else { // If not native resolution, use interpolation
+    for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
+      float progress = i / float(STRIP_LED_COUNT - 1);
+      leds_out[i] = lerp_led(progress, leds);
+    }
+  }
+  FastLED.show();
 
   current_frame++;
 }
@@ -107,7 +116,7 @@ CRGB lerp_led(float index, CRGB * led_array) {
   }
   int index_i = (int)index_f;
   float index_f_frac = index_f - index_i;
-  CRGB out_col = CRGB(0,0,0);
+  CRGB out_col = CRGB(0, 0, 0);
   out_col.r += (1 - index_f_frac) * led_array[index_i].r;
   out_col.g += (1 - index_f_frac) * led_array[index_i].g;
   out_col.b += (1 - index_f_frac) * led_array[index_i].b;
@@ -177,54 +186,54 @@ void fade_edges(uint8_t width) {
 }
 
 
-void process_color_push(){
-	float velocity_sum = 0.0;
-	for(uint16_t i = 0; i < 128; i++){
-		float velocity = fft_velocities[i];
-		if(velocity < 0.20){
-			velocity = 0.0;
-		}
-		velocity_sum += velocity;
-	}
+void process_color_push() {
+  float velocity_sum = 0.0;
+  for (uint16_t i = 0; i < 128; i++) {
+    float velocity = fft_velocities[i];
+    if (velocity < 0.20) {
+      velocity = 0.0;
+    }
+    velocity_sum += velocity;
+  }
 
-	float push_velocity = velocity_sum / 128.0;
-	if(push_velocity > 1.0){
-		push_velocity = 1.0;
-	}
-	
-	push_velocity *= push_velocity;
-	push_velocity *= push_velocity;
-	push_velocity *= push_velocity;
-	push_velocity *= 32.0;
+  float push_velocity = velocity_sum / 128.0;
+  if (push_velocity > 1.0) {
+    push_velocity = 1.0;
+  }
 
-  push_velocity *= (((1.0-SMOOTHING)*0.75) + 0.25);
+  push_velocity *= push_velocity;
+  push_velocity *= push_velocity;
+  push_velocity *= push_velocity;
+  push_velocity *= 32.0;
+
+  push_velocity *= (((1.0 - SMOOTHING) * 0.5) + 0.5);
 
   //Serial.println(push_velocity);
 
-	if(push_velocity > hue_push){
-		hue_push = push_velocity;
-	}
-	else{
-		hue_push *= 0.98;
-	}
+  if (push_velocity > hue_push) {
+    hue_push = push_velocity;
+  }
+  else {
+    hue_push *= 0.98;
+  }
 
-	if (hue_push > 10.0) {
-		hue_push = 10.0;
-	}
+  if (hue_push > 10.0) {
+    hue_push = 10.0;
+  }
 
- if(hue_push < 0.1){
-   hue_push = 0.1;
- }
- 
-	hue -= hue_push;
+  if (hue_push < 0.1) {
+    hue_push = 0.1;
+  }
+
+  hue -= hue_push;
 }
 
-void run_warning_led(){
-  if(warn == true){
-    leds[NUM_LEDS-1] = CRGB(255,0,0);
+void run_warning_led() {
+  if (warn == true) {
+    leds[NUM_LEDS - 1] = CRGB(255, 0, 0);
     warn = false;
   }
-  else{
-    leds[NUM_LEDS-1] = CRGB(0,0,0);    
+  else {
+    leds[NUM_LEDS - 1] = CRGB(0, 0, 0);
   }
 }

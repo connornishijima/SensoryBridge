@@ -1,5 +1,10 @@
 #include <driver/adc.h>
 
+void read_config();
+void load_dc_offset();
+void write_config();
+void write_dc_offset();
+
 void print_system_info(){
   Serial.print("\n\n\n");
 
@@ -18,7 +23,8 @@ void print_system_info(){
   Serial.println();
   Serial.println("Currently, this has no effect other than");
   Serial.println("to print the firmware version number and");
-  Serial.println("FPS value.");
+  Serial.println("FPS value, and use the 128th LED to     ");
+  Serial.println("indicate audio clipping.                ");
   Serial.println();
   Serial.println("(Press MODE again to continue booting!)");
 
@@ -65,66 +71,34 @@ void init_bridge() {
     Serial.flush();
   }
 
-  // Uncomment/edit one of the following lines for your leds arrangement.
-  // ## Clockless types ##
-  FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
-  // FastLED.addLeds<SM16703, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1829, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1812, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1809, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1804, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1803, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<UCS1903, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<UCS1903B, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<UCS1904, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<UCS2903, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2812, LED_DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<WS2852, LED_DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<WS2812B, LED_DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<GS1903, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<SK6812, LED_DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<SK6822, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<APA106, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<PL9823, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<SK6822, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2811, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2813, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<APA104, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2811_400, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<GE8822, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<GW6205, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<GW6205_400, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<LPD1886, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<LPD1886_8BIT, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // ## Clocked (SPI) types ##
-  // FastLED.addLeds<LPD6803, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<LPD8806, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<WS2801, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2803, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<SM16716, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<P9813, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
-  // FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
-  // FastLED.addLeds<APA102, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
-  // FastLED.addLeds<SK9822, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
-
-  //FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 4000);
-
-  for (uint16_t i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB(0, 0, 0);
-    last_fft_frame[i] = 0.01;
-  }
-  FastLED.show();
-  delay(500);
-
-  for (uint16_t i = 0; i < 128; i++) {
-    fft_ambient_noise[i] = 0;
-  }
-
   if (!LittleFS.begin(true)) { // Format if failed
     if(debug_mode){
       Serial.println("LittleFS Mount Failed");
     }
     return;
+  }
+
+  read_config();
+  load_dc_offset();
+
+  // Uncomment/edit one of the following lines for your led strip type.
+  FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, STRIP_LED_COUNT);  // GRB ordering is assumed
+  //FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, STRIP_LED_COUNT); 
+  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
+
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB(0, 0, 0);
+    last_fft_frame[i] = 0.01;
+  }
+  for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
+    leds_out[i] = CRGB(0, 0, 0);
+  }
+    
+  FastLED.show();
+  delay(500);
+
+  for (uint16_t i = 0; i < 128; i++) {
+    fft_ambient_noise[i] = 0;
   }
 
   load_ambient_noise_calibration();
@@ -176,6 +150,8 @@ void check_buttons() {
         Serial.println("COLLECTING AMBIENT NOISE SAMPLES IN 500 MS");
       }
       collecting_ambient_noise = true;
+      DC_OFFSET = 0;
+      
       ambient_noise_samples_collected = 0;
       for (uint16_t i = 0; i < 128; i++) {
         fft_ambient_noise[i] = 0;
@@ -187,6 +163,7 @@ void check_buttons() {
       for (uint16_t i = 0; i < 128; i++) {
         fft_ambient_noise[i] = 0;
       }
+      save_dc_offset();
       save_ambient_noise_calibration();
       if(debug_mode){
         Serial.println("CLEARED AMBIENT NOISE CALIBRATION!");
@@ -218,9 +195,24 @@ void check_buttons() {
     if (LIGHTSHOW_MODE >= NUM_MODES) {
       LIGHTSHOW_MODE = 0;
     }
+
+    last_setting_change = millis();
+    settings_updated = true;
   }
   else if(mode_pressed && mode_long_press){
-    incandescent_mode = !incandescent_mode;
+    MIRROR_ENABLED = !MIRROR_ENABLED;
+    last_setting_change = millis();
+    settings_updated = true;
+  }
+}
+
+void check_settings(){
+  if(settings_updated){
+    uint32_t t_now = millis();
+    if(t_now - last_setting_change >= 3000){
+      write_config();
+      settings_updated = false;
+    }
   }
 }
 
@@ -272,8 +264,8 @@ void check_knobs() {
 
     //SENSITIVITY = 1.0 - SENSITIVITY;
 
-    float smooth_low  = 0.700;
-    float smooth_high = 0.950;
+    float smooth_low  = 0.600;
+    float smooth_high = 0.990;
 
     SMOOTHING = (SMOOTHING) * (smooth_high - smooth_low) / (1.0) + smooth_low;
 
@@ -323,7 +315,7 @@ void check_sweet_spot() {
   sweet_spot_up = sweet_spot_up * sweet_spot_up;
 
   sweet_spot_down   = int16_t(sweet_spot_down   * 2048);
-  sweet_spot_center = int16_t(sweet_spot_center * 1024); // dimmer than others to appear same brightness with different LED type
+  sweet_spot_center = int16_t(sweet_spot_center * 2048);
   sweet_spot_up     = int16_t(sweet_spot_up     * 2048);
 
   if(sweet_spot_down < 10){
@@ -407,4 +399,44 @@ void end_timing(){
   section_start = 0;
   section_end   = 0;
   #endif
+}
+
+void read_config(){
+  File file = LittleFS.open("/config.bin", FILE_READ);
+  if (!file) {
+    if(debug_mode){
+      Serial.println("- failed to open config.bin for reading");
+    }
+    return;
+  }
+  else{
+    file.seek(0);
+    LIGHTSHOW_MODE = file.read();
+    MIRROR_ENABLED = file.read();
+
+    if(debug_mode){
+      Serial.println("READ CONFIG SUCCESSFULLY");
+    }
+  }
+  file.close();
+}
+
+void write_config(){
+  File file = LittleFS.open("/config.bin", FILE_WRITE);
+  if (!file) {
+    if(debug_mode){
+      Serial.println("- failed to open config.bin for writing");
+    }
+    return;
+  }
+  else{
+    file.seek(0);
+    file.write(LIGHTSHOW_MODE);
+    file.write(MIRROR_ENABLED);
+
+    if(debug_mode){
+      Serial.println("WROTE CONFIG SUCCESSFULLY");
+    }
+  }
+  file.close();
 }

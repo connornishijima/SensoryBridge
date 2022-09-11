@@ -18,14 +18,14 @@ void process_fft() {
   }
 
   for (uint16_t k = 0 ; k < BUFFER_SIZE ; k += 8) { // Fill FFT buffer with I2S samples (uint32_t to float)
-    fft_input[k + 0] = i2s_samples[k + 0]; // 8 at a time to slightly unroll this loop for speed
-    fft_input[k + 1] = i2s_samples[k + 1];
-    fft_input[k + 2] = i2s_samples[k + 2];
-    fft_input[k + 3] = i2s_samples[k + 3];
-    fft_input[k + 4] = i2s_samples[k + 4];
-    fft_input[k + 5] = i2s_samples[k + 5];
-    fft_input[k + 6] = i2s_samples[k + 6];
-    fft_input[k + 7] = i2s_samples[k + 7];
+    fft_input[k + 0] = i2s_samples[i2s_history_index][k + 0]; // 8 at a time to slightly unroll this loop for speed
+    fft_input[k + 1] = i2s_samples[i2s_history_index][k + 1];
+    fft_input[k + 2] = i2s_samples[i2s_history_index][k + 2];
+    fft_input[k + 3] = i2s_samples[i2s_history_index][k + 3];
+    fft_input[k + 4] = i2s_samples[i2s_history_index][k + 4];
+    fft_input[k + 5] = i2s_samples[i2s_history_index][k + 5];
+    fft_input[k + 6] = i2s_samples[i2s_history_index][k + 6];
+    fft_input[k + 7] = i2s_samples[i2s_history_index][k + 7];
   }
 
   // FFT MAGIC
@@ -69,7 +69,7 @@ void process_fft() {
   }
 
   start_timing("DISCOVER MAX VAL");
-  int32_t max_val = 0;
+  max_val = 0;
   for (uint8_t i = 0; i < 128; i++) {
     if (final_fft[fft_history_index][i] < 0) {
       final_fft[fft_history_index][i] = 0;
@@ -84,23 +84,44 @@ void process_fft() {
     }
 
     if ((final_fft[fft_history_index][i]*scale) > max_val) {
-      max_val = final_fft[fft_history_index][i];
+      max_val = final_fft[fft_history_index][i]*scale;
     }
   }
 
+  max_val_smoothed = max_val*0.1 + max_val_last*0.9;
+  max_val_last = max_val_smoothed;
+
   start_timing("CALC MULTIPLIERS");
   if (max_val > (FFT_CEILING)) {
-    multiplier = (FFT_CEILING) / float(max_val); // shorten to FFT_CEILING by autoranging if value exceeds FFT_CEILING
+    multiplier_target = (FFT_CEILING) / float(max_val); // shorten to FFT_CEILING by autoranging if value exceeds FFT_CEILING
   }
   else {
-    multiplier = 1.0;
+    multiplier_target = 1.0;
   }
 
-  if (multiplier < 0.0) {
-    multiplier = 0.0;
+  if (multiplier_target > 1.0) {
+    multiplier_target = 1.0;
+  }
+  if (multiplier_target < 0.0) {
+    multiplier_target = 0.0;
   }
 
-  multiplier_smoothed = (multiplier * 0.0125) + (multiplier_last * 0.9875); // follow peaks UP faster than DOWN
+  if(multiplier < multiplier_target){
+    multiplier += multiplier_push;
+  }
+  
+  if(multiplier > multiplier_target){
+    multiplier -= multiplier_push;
+  }
+
+  multiplier_smoothed = (multiplier * 0.05) + (multiplier_last * 0.95);   
+
+  if (multiplier_smoothed > 1.0) {
+    multiplier_smoothed = 1.0;
+  }
+  if (multiplier_smoothed < 0.0) {
+    multiplier_smoothed = 0.0;
+  }
   
   multiplier_last = multiplier_smoothed;
 

@@ -13,7 +13,7 @@ const i2s_config_t i2s_config = {
 
 const i2s_pin_config_t pin_config = {
   .bck_io_num   = I2S_BCLK_PIN,
-  .ws_io_num    = I2S_LRCLK_PIN, 
+  .ws_io_num    = I2S_LRCLK_PIN,
   .data_out_num = -1, // not used (only for outputs)
   .data_in_num  = I2S_DOUT_PIN
 };
@@ -22,7 +22,7 @@ const i2s_pin_config_t pin_config = {
 void INIT_I2S() {
   esp_err_t err = i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
   if (err != ESP_OK) {
-    if(debug_mode){
+    if (debug_mode) {
       Serial.printf("Failed installing driver: %d\n", err);
     }
     while (true) {}
@@ -33,28 +33,41 @@ void INIT_I2S() {
 
   err = i2s_set_pin(I2S_PORT, &pin_config);
   if (err != ESP_OK) {
-    if(debug_mode){
+    if (debug_mode) {
       Serial.printf("Failed setting pin: %d\n", err);
     }
     while (true) {}
   }
-  if(debug_mode){
+  if (debug_mode) {
     Serial.println("I2S driver installed.");
   }
 }
 
 void capture_audio() {
-  i2s_read(I2S_PORT, i2s_samples_raw, BUFFER_SIZE * 4, &bytes_read, portMAX_DELAY);
-  for(uint16_t i = 0; i < BUFFER_SIZE; i++){
-    i2s_samples[i] = ((i2s_samples_raw[i] / 1000000.0) + 110) * 128;
+  i2s_history_index++;
+  if (i2s_history_index >= 6) {
+    i2s_history_index = 0;
+  }
 
-    if(i2s_samples[i] > 32767){
-      i2s_samples[i] = 32767;
+  i2s_read(I2S_PORT, i2s_samples_raw, BUFFER_SIZE * 4, &bytes_read, portMAX_DELAY);
+  for (uint16_t i = 0; i < BUFFER_SIZE; i++) {
+    i2s_samples[i2s_history_index][i] = (((i2s_samples_raw[i] / 1000000.0) + 110) * 128) + 3000;
+
+    if (i2s_samples[i2s_history_index][i] > 32767) {
+      i2s_samples[i2s_history_index][i] = 32767;
       warn = true;
     }
-    else if(i2s_samples[i] < -32767){
-      i2s_samples[i] = -32767;
+    else if (i2s_samples[i2s_history_index][i] < -32767) {
+      i2s_samples[i2s_history_index][i] = -32767;
       warn = true;
     }
+  }
+
+  if (collecting_ambient_noise) {
+    float frame_sum = 0.0;
+    for(uint16_t i = 0; i < BUFFER_SIZE; i++){
+      frame_sum += i2s_samples[i2s_history_index][i];
+    }
+    DC_OFFSET += (frame_sum / float(BUFFER_SIZE));
   }
 }
