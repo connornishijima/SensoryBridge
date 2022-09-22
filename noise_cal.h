@@ -11,6 +11,9 @@ void print_bits(uint32_t input) {
 }
 
 void show_progress_bar(float progress, CRGB col) {
+  for (uint8_t i = 0; i < 128; i++) {
+    leds[i] = CRGB(0,0,0);
+  }
   uint16_t end_led = 128 * progress;
   float max_val = 0.0;
   for (uint8_t i = 0; i < 128; i++) {
@@ -19,11 +22,13 @@ void show_progress_bar(float progress, CRGB col) {
     }
   }
   for (uint8_t i = 0; i < 128; i++) {
-    float out_val = (fft_ambient_noise[i] / max_val);
-    out_val = out_val * out_val;
-    leds[i] = CRGB(255 * out_val, 0, 0);
-    if (abs(i - end_led) <= 1) {
-      leds[i] += col;
+    if (i == end_led) {
+      leds[i] = col;
+    }
+    else if(i < end_led){
+      float out_val = (fft_ambient_noise[i] / max_val);
+      // out_val = out_val * out_val;
+      leds[i] = CHSV(16,255,255 * out_val);
     }
   }
 
@@ -171,7 +176,7 @@ void save_dc_offset() {
 void run_ambient_noise_calibration() {
   if (ambient_noise_samples_collected < AMBIENT_NOISE_SAMPLES) {
     float collection_progress = ambient_noise_samples_collected / float(AMBIENT_NOISE_SAMPLES);
-    show_progress_bar(collection_progress, CRGB(0, 255, 0));
+    show_progress_bar(collection_progress, CRGB(0, 255, 255));
 
     for (uint16_t i = 0; i < 128; i++) {
       if (fft_integer[i] > fft_ambient_noise[i]) {

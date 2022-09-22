@@ -151,6 +151,24 @@ void shift_leds_down(uint16_t offset) {
   load_leds_from_temp();
 }
 
+void fade_edge(bool symmetry) {
+  save_leds_to_temp();
+  for (int16_t i = 0; i < 32; i++) {
+    float prog = i / 31.0;
+
+    leds_temp[127 - i].r *= prog;
+    leds_temp[127 - i].g *= prog;
+    leds_temp[127 - i].b *= prog;
+
+    if (symmetry) {
+      leds_temp[i].r *= prog;
+      leds_temp[i].g *= prog;
+      leds_temp[i].b *= prog;
+    }
+  }
+  load_leds_from_temp();
+}
+
 
 void mirror_image_upwards() {
   for (uint8_t i = 0; i < 64; i++) {
@@ -203,10 +221,9 @@ void process_color_push() {
 
   push_velocity *= push_velocity;
   push_velocity *= push_velocity;
-  push_velocity *= push_velocity;
   push_velocity *= 32.0;
 
-  push_velocity *= (((1.0 - SMOOTHING) * 0.5) + 0.5);
+  push_velocity *= (((1.0 - SMOOTHING) * 0.25) + 0.75);
 
   //Serial.println(push_velocity);
 
@@ -217,15 +234,28 @@ void process_color_push() {
     hue_push *= 0.98;
   }
 
-  if (hue_push > 10.0) {
-    hue_push = 10.0;
+  if (hue_push > 20.0) {
+    hue_push = 20.0;
   }
 
-  if (hue_push < 0.1) {
-    hue_push = 0.1;
+  if (hue_push < 0.01) {
+    hue_push = 0.01;
   }
 
   hue -= hue_push;
+}
+
+void clear_all_led_buffers() {
+  for (uint8_t i = 0; i < 128; i++) {
+    leds[i] = CRGB(0,0,0);
+    leds_diffuse[i] = CRGB(0,0,0);
+    leds_temp[i] = CRGB(0,0,0);
+    leds_last[i] = CRGB(0,0,0);
+  }
+
+  for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
+    leds_out[i] = CRGB(0,0,0);
+  }
 }
 
 void run_warning_led() {

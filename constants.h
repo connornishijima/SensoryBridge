@@ -5,7 +5,7 @@
 #define FFT_HISTORY_LEN            6
 #define AMBIENT_NOISE_SAMPLES      128
 
-#define SWEET_SPOT   0.75F
+#define SWEET_SPOT   0.45F
 
 #define PHOTONS_PIN  1
 #define BOOST_PIN    2

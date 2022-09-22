@@ -51,16 +51,18 @@ uint32_t tempo_animation_frame_cap = 90;
 uint32_t tempo_animation_frame_cap_target = 90;
 uint32_t tempo_animation_frame = 0;
 
-int32_t max_val = 0;
-int32_t max_val_last = 0;
-int32_t max_val_smoothed = 0;
+int32_t max_vals[4] = {0};
+int32_t max_vals_last[4] = {0};
+int32_t max_vals_smoothed[4] = {0};
 
 float multiplier_sum = 0.0;
-float multiplier = 0.01;
-float multiplier_target = 1.00;
+float multipliers[4] = {0.01,0.01,0.01,0.01};
+float multiplier_targets[4] = {1.00,1.00,1.00,1.00};
 float multiplier_push = 0.015;
-float multiplier_last = 0.01;
-float multiplier_smoothed = 0.01;
+float multipliers_last[4] = {0.01,0.01,0.01,0.01};
+float multipliers_smoothed[4] = {0.01,0.01,0.01,0.01};
+uint16_t multiplier_centers[4]   = {16, 48, 80, 112};
+uint16_t multiplier_bounds[4][2] = {{0,31}, {32, 63}, {64,95}, {96, 127}};
 
 String current_section = "section_name";
 uint32_t section_start = 0;
@@ -73,3 +75,13 @@ int32_t DC_OFFSET =  0.0;
 
 uint32_t last_setting_change = 0;
 bool settings_updated = false;
+
+struct button{
+  uint8_t pin = 0;
+  uint32_t last_down = 0;
+  uint32_t last_up = 0;
+  bool pressed = false;
+};
+
+button noise_button;
+button mode_button;

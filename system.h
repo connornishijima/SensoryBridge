@@ -5,13 +5,13 @@ void load_dc_offset();
 void write_config();
 void write_dc_offset();
 
-void print_system_info(){
+void print_system_info() {
   Serial.print("\n\n\n");
 
   Serial.println("--------------------------");
   Serial.println("* SENSORY BRIDGE *");
   Serial.println("--------------------------");
-  
+
   Serial.print("FIRMWARE VERSION: ");
   Serial.println(FIRMWARE_VERSION);
 
@@ -31,48 +31,51 @@ void print_system_info(){
   Serial.flush();
 }
 
-void init_serial(uint32_t baud_rate){
+void init_serial(uint32_t baud_rate) {
   Serial.begin(baud_rate);
   bool timeout = false;
   uint32_t t_start = millis();
   uint32_t t_timeout = t_start + 250;
 
-  while(!Serial && timeout == false){
-    if(millis() >= t_timeout){
+  while (!Serial && timeout == false) {
+    if (millis() >= t_timeout) {
       timeout = true; // Must not be connected to PC
       break;
     }
-    else{
+    else {
       yield();
     }
   }
 }
 
 void init_bridge() {
-  pinMode(NOISE_CAL_PIN, INPUT_PULLUP);
-  pinMode(MODE_PIN, INPUT_PULLUP);
+  noise_button.pin = NOISE_CAL_PIN;
+  mode_button.pin = MODE_PIN;
+
+  pinMode(noise_button.pin, INPUT_PULLUP);
+  pinMode(mode_button.pin, INPUT_PULLUP);
 
   init_serial(500000);
 
-  if(digitalRead(MODE_PIN) == LOW){
-    while(digitalRead(MODE_PIN) == LOW){
+  if (digitalRead(mode_button.pin) == LOW) {
+    while (digitalRead(mode_button.pin) == LOW) {
       yield();
     }
     debug_mode = true;
     print_system_info();
 
-    while(digitalRead(MODE_PIN) == HIGH){ // Wait on second MODE press
+    while (digitalRead(mode_button.pin) == HIGH) { // Wait on second MODE press
       yield();
     }
   }
-  else{
+  else {
     Serial.print("SBFV: ");
     Serial.println(FIRMWARE_VERSION);
     Serial.flush();
   }
 
   if (!LittleFS.begin(true)) { // Format if failed
-    if(debug_mode){
+    if (debug_mode) {
       Serial.println("LittleFS Mount Failed");
     }
     return;
@@ -83,7 +86,7 @@ void init_bridge() {
 
   // Uncomment/edit one of the following lines for your led strip type.
   FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, STRIP_LED_COUNT);  // GRB ordering is assumed
-  //FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, STRIP_LED_COUNT); 
+  //FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, STRIP_LED_COUNT);
   FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
 
   for (uint16_t i = 0; i < NUM_LEDS; i++) {
@@ -93,7 +96,7 @@ void init_bridge() {
   for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
     leds_out[i] = CRGB(0, 0, 0);
   }
-    
+
   FastLED.show();
   delay(500);
 
@@ -132,84 +135,96 @@ void log_fps() {
 }
 
 void check_buttons() {
-  // NOISE CAL ------------------------------------------
-  bool noise_cal_reset = false;
-  if (digitalRead(NOISE_CAL_PIN) == LOW) {
-    uint32_t click_start = millis();
-    while (digitalRead(NOISE_CAL_PIN) == LOW) {
-      uint32_t t_now = millis();
-      if (t_now - click_start >= 1000) {
-        noise_cal_reset = true;
-        break;
-      }
-      delay(1);
+  uint32_t t_now = millis();
+  if (digitalRead(noise_button.pin) == LOW) {
+    if (noise_button.pressed == false) {
+      noise_button.pressed = true;
+      noise_button.last_down = t_now;
     }
 
-    if (!noise_cal_reset) {
-      if(debug_mode){
-        Serial.println("COLLECTING AMBIENT NOISE SAMPLES IN 500 MS");
-      }
-      collecting_ambient_noise = true;
-      DC_OFFSET = 0;
-      
-      ambient_noise_samples_collected = 0;
-      for (uint16_t i = 0; i < 128; i++) {
-        fft_ambient_noise[i] = 0;
-      }
-
-      delay(500);
-    }
-    else { // Noise cal reset
+    if (t_now - noise_button.last_down > 250 && noise_button.last_up < noise_button.last_down) {
       for (uint16_t i = 0; i < 128; i++) {
         fft_ambient_noise[i] = 0;
       }
       save_dc_offset();
       save_ambient_noise_calibration();
-      if(debug_mode){
+      if (debug_mode) {
         Serial.println("CLEARED AMBIENT NOISE CALIBRATION!");
       }
-    }
 
-    while (digitalRead(NOISE_CAL_PIN) == LOW) {
-      delay(1);
+      noise_button.last_up = t_now;
+    }
+  }
+  else if (digitalRead(noise_button.pin) == HIGH) {
+    if (noise_button.pressed == true) {
+      noise_button.pressed = false;
+      noise_button.last_up = t_now;
+
+      uint32_t press_duration = noise_button.last_up - noise_button.last_down;
+
+      if (press_duration < 250) {
+        if (debug_mode) {
+          Serial.println("COLLECTING AMBIENT NOISE SAMPLES IN 500 MS");
+        }
+        collecting_ambient_noise = true;
+        DC_OFFSET = 0;
+
+        ambient_noise_samples_collected = 0;
+        for (uint16_t i = 0; i < 128; i++) {
+          fft_ambient_noise[i] = 0;
+        }
+
+        for (uint16_t i = 0; i < 128; i++) {
+          for (uint16_t x = 0; x < 128; x++) {
+            leds[x] = CRGB(0, 0, 0);
+          }
+          uint16_t ir = (STRIP_LED_COUNT-1)-i;
+          leds[ir] = CRGB(0, 255, 255);
+          show_leds();
+        }
+
+        clear_all_led_buffers();
+      }
     }
   }
 
-  // MODE SELECT ----------------------------------------
-  bool mode_pressed = false;
-  bool mode_long_press = false;
-  if (digitalRead(MODE_PIN) == LOW) {
-    mode_pressed = true;
-    uint32_t t_start = millis();
-    while (digitalRead(MODE_PIN) == LOW) {
-      yield();
-    }
-    uint32_t t_end = millis();
-    if((t_end-t_start) >= 250){
-      mode_long_press = true;
-    }
-  }
-
-  if(mode_pressed && !mode_long_press){
-    LIGHTSHOW_MODE++;
-    if (LIGHTSHOW_MODE >= NUM_MODES) {
-      LIGHTSHOW_MODE = 0;
+  if (digitalRead(mode_button.pin) == LOW) {
+    if (mode_button.pressed == false) {
+      mode_button.pressed = true;
+      mode_button.last_down = t_now;
     }
 
-    last_setting_change = millis();
-    settings_updated = true;
+    if (t_now - mode_button.last_down > 250 && mode_button.last_up < mode_button.last_down) {
+      MIRROR_ENABLED = !MIRROR_ENABLED;
+      last_setting_change = millis();
+      settings_updated = true;
+      mode_button.last_up = t_now;
+    }
   }
-  else if(mode_pressed && mode_long_press){
-    MIRROR_ENABLED = !MIRROR_ENABLED;
-    last_setting_change = millis();
-    settings_updated = true;
+  else if (digitalRead(mode_button.pin) == HIGH) {
+    if (mode_button.pressed == true) {
+      mode_button.pressed = false;
+      mode_button.last_up = t_now;
+
+      uint32_t press_duration = mode_button.last_up - mode_button.last_down;
+
+      if (press_duration < 250) {
+        LIGHTSHOW_MODE++;
+        if (LIGHTSHOW_MODE >= NUM_MODES) {
+          LIGHTSHOW_MODE = 0;
+        }
+
+        last_setting_change = millis();
+        settings_updated = true;
+      }
+    }
   }
 }
 
-void check_settings(){
-  if(settings_updated){
+void check_settings() {
+  if (settings_updated) {
     uint32_t t_now = millis();
-    if(t_now - last_setting_change >= 3000){
+    if (t_now - last_setting_change >= 3000) {
       write_config();
       settings_updated = false;
     }
@@ -269,8 +284,8 @@ void check_knobs() {
 
     SMOOTHING = (SMOOTHING) * (smooth_high - smooth_low) / (1.0) + smooth_low;
 
-    float sensitivity_low  = 327.67;
-    float sensitivity_high = 32767;
+    float sensitivity_low  = 3.2767;
+    float sensitivity_high = 3276.7;
 
     FFT_CEILING = (SENSITIVITY) * (sensitivity_high - sensitivity_low) / (1.0) + sensitivity_low;
     //Serial.println(FFT_CEILING);
@@ -290,7 +305,7 @@ void check_sweet_spot() {
   float sweet_spot_center = 0.0;
   float sweet_spot_up     = 0.0;
 
-  sweet_spot_down = fabs((SWEET_SPOT+0.2) - multiplier_sum);
+  sweet_spot_down = fabs((SWEET_SPOT + 0.2) - multiplier_sum);
   if (sweet_spot_down > 0.125) {
     sweet_spot_down = 0.125;
   }
@@ -306,7 +321,7 @@ void check_sweet_spot() {
   sweet_spot_center = 1.0 - sweet_spot_center;
   sweet_spot_center = sweet_spot_center * sweet_spot_center;
 
-  sweet_spot_up = fabs((SWEET_SPOT-0.2) - multiplier_sum);
+  sweet_spot_up = fabs((SWEET_SPOT - 0.2) - multiplier_sum);
   if (sweet_spot_up > 0.125) {
     sweet_spot_up = 0.125;
   }
@@ -318,13 +333,13 @@ void check_sweet_spot() {
   sweet_spot_center = int16_t(sweet_spot_center * 2048);
   sweet_spot_up     = int16_t(sweet_spot_up     * 2048);
 
-  if(sweet_spot_down < 10){
+  if (sweet_spot_down < 10) {
     sweet_spot_down = 10;
   }
-  if(sweet_spot_center < 10){
+  if (sweet_spot_center < 10) {
     sweet_spot_center = 10;
   }
-  if(sweet_spot_up < 10){
+  if (sweet_spot_up < 10) {
     sweet_spot_up = 10;
   }
 
@@ -374,67 +389,67 @@ void check_serial() {
   }
 }
 
-void start_timing(String section_name){
-  #ifdef LOG_TIMING
-  if(section_start != 0 || section_end != 0){
+void start_timing(String section_name) {
+#ifdef LOG_TIMING
+  if (section_start != 0 || section_end != 0) {
     section_end = micros();
     Serial.print(current_section);
     Serial.print(": ");
-    Serial.print(section_end-section_start);
-    Serial.println("us");    
+    Serial.print(section_end - section_start);
+    Serial.println("us");
   }
   current_section = section_name;
   section_start = micros();
-  #endif
+#endif
 }
 
-void end_timing(){
-  #ifdef LOG_TIMING
+void end_timing() {
+#ifdef LOG_TIMING
   section_end = micros();
   Serial.print(current_section);
   Serial.print(": ");
-  Serial.print(section_end-section_start);
+  Serial.print(section_end - section_start);
   Serial.println("us");
 
   section_start = 0;
   section_end   = 0;
-  #endif
+#endif
 }
 
-void read_config(){
+void read_config() {
   File file = LittleFS.open("/config.bin", FILE_READ);
   if (!file) {
-    if(debug_mode){
+    if (debug_mode) {
       Serial.println("- failed to open config.bin for reading");
     }
     return;
   }
-  else{
+  else {
     file.seek(0);
     LIGHTSHOW_MODE = file.read();
     MIRROR_ENABLED = file.read();
 
-    if(debug_mode){
+    if (debug_mode) {
       Serial.println("READ CONFIG SUCCESSFULLY");
     }
   }
   file.close();
 }
 
-void write_config(){
+void write_config() {
   File file = LittleFS.open("/config.bin", FILE_WRITE);
   if (!file) {
-    if(debug_mode){
+    if (debug_mode) {
       Serial.println("- failed to open config.bin for writing");
     }
     return;
   }
-  else{
+  else {
     file.seek(0);
     file.write(LIGHTSHOW_MODE);
     file.write(MIRROR_ENABLED);
 
-    if(debug_mode){
+    if (debug_mode) {
       Serial.println("WROTE CONFIG SUCCESSFULLY");
     }
   }

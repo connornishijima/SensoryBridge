@@ -7,10 +7,10 @@ void process_fft() {
   static uint32_t iter = 0;
   iter++;
 
-  #ifdef LOG_TIMING
+#ifdef LOG_TIMING
   Serial.println("-----------");
   start_timing("FILL_BUFFER");
-  #endif
+#endif
 
   fft_history_index++; // Advance in the FFT history
   if (fft_history_index >= FFT_HISTORY_LEN) {
@@ -59,76 +59,98 @@ void process_fft() {
 
   start_timing("SCALE RANGE");
   for (uint16_t i = 0; i < 128; i++) {
-    scaled_fft[i] = fft_integer[i>>1];
+    scaled_fft[i] = fft_integer[i >> 1];
   }
 
-  start_timing("SCALE LINEAR");
-  for (uint16_t i = 0; i < 128; i++) {
-    float pos = (i / 127.0); // Correct FFT to linear scale
-    final_fft[fft_history_index][i] = interpolate_fft((pos * pos), scaled_fft, 128);
+  if (LIGHTSHOW_MODE != DUET_MODE_LOG) {
+    start_timing("SCALE LINEAR");
+    for (uint16_t i = 0; i < 128; i++) {
+      float pos = (i / 127.0); // Correct FFT to linear scale
+      final_fft[fft_history_index][i] = interpolate_fft((pos * pos), scaled_fft, 128);
+    }
+  }
+  else{
+    for (uint16_t i = 0; i < 128; i++) {
+      final_fft[fft_history_index][i] = scaled_fft[i];
+    }
   }
 
   start_timing("DISCOVER MAX VAL");
-  max_val = 0;
+  max_vals[0] = 0;
+  max_vals[1] = 0;
+  max_vals[2] = 0;
+  max_vals[3] = 0;
   for (uint8_t i = 0; i < 128; i++) {
     if (final_fft[fft_history_index][i] < 0) {
       final_fft[fft_history_index][i] = 0;
     }
 
-    float scale = 1.0;
-    if(i <= 64){
-      scale = i / 64.0;
+    float scaled_val = final_fft[fft_history_index][i];
+    if(i < 64){
+      float scale = (i / 64.0);
       if(scale < 0.1){
         scale = 0.1;
       }
+      scaled_val = final_fft[fft_history_index][i]*scale;
     }
 
-    if ((final_fft[fft_history_index][i]*scale) > max_val) {
-      max_val = final_fft[fft_history_index][i]*scale;
+    for (uint8_t b = 0; b < 4; b++) {
+      if (i >= multiplier_bounds[b][0] && i <= multiplier_bounds[b][1]) {
+        if (scaled_val > max_vals[b]) {
+          max_vals[b] = scaled_val;
+        }
+      }
+    }
+
+    for (uint8_t b = 0; b < 4; b++) {
+      max_vals_smoothed[b] = max_vals[b] * 0.1 + max_vals_last[b] * 0.9;
+      max_vals_last[b] = max_vals_smoothed[b];
+
+      if (max_vals[b] > (FFT_CEILING)) {
+        multiplier_targets[b] = (FFT_CEILING) / float(max_vals[b]); // shorten to FFT_CEILING by autoranging if value exceeds FFT_CEILING
+      }
+      else {
+        multiplier_targets[b] = 1.0;
+      }
+
+      if (multiplier_targets[b] > 1.0) {
+        multiplier_targets[b] = 1.0;
+      }
+      if (multiplier_targets[b] < 0.0) {
+        multiplier_targets[b] = 0.0;
+      }
+
+      if (multipliers[b] < multiplier_targets[b]) {
+        multipliers[b] += (multiplier_push*2);
+      }
+
+      if (multipliers[b] > multiplier_targets[b]) {
+        multipliers[b] -= multiplier_push;
+      }
+
+      multipliers_smoothed[b] = (multipliers[b] * 0.1) + (multipliers_last[b] * 0.9);
+
+      if (multipliers_smoothed[b] > 1.0) {
+        multipliers_smoothed[b] = 1.0;
+      }
+      if (multipliers_smoothed[b] < 0.0) {
+        multipliers_smoothed[b] = 0.0;
+      }
+
+      multipliers_last[b] = multipliers_smoothed[b];
     }
   }
-
-  max_val_smoothed = max_val*0.1 + max_val_last*0.9;
-  max_val_last = max_val_smoothed;
-
-  start_timing("CALC MULTIPLIERS");
-  if (max_val > (FFT_CEILING)) {
-    multiplier_target = (FFT_CEILING) / float(max_val); // shorten to FFT_CEILING by autoranging if value exceeds FFT_CEILING
-  }
-  else {
-    multiplier_target = 1.0;
-  }
-
-  if (multiplier_target > 1.0) {
-    multiplier_target = 1.0;
-  }
-  if (multiplier_target < 0.0) {
-    multiplier_target = 0.0;
-  }
-
-  if(multiplier < multiplier_target){
-    multiplier += multiplier_push;
-  }
-  
-  if(multiplier > multiplier_target){
-    multiplier -= multiplier_push;
-  }
-
-  multiplier_smoothed = (multiplier * 0.05) + (multiplier_last * 0.95);   
-
-  if (multiplier_smoothed > 1.0) {
-    multiplier_smoothed = 1.0;
-  }
-  if (multiplier_smoothed < 0.0) {
-    multiplier_smoothed = 0.0;
-  }
-  
-  multiplier_last = multiplier_smoothed;
-
-  start_timing("OUTPUT WITH MULTIPLIER");
 
   for (uint8_t i = 0; i < 128; i++) {
-    final_fft[fft_history_index][i] *= multiplier_smoothed;
+    final_fft[fft_history_index][i] *= interpolate_multiplier(i);
+
+    if(i < 64){
+      float scale = (i / 64.0);
+      if(scale < 0.25){
+        scale = 0.25;
+      }
+      final_fft[fft_history_index][i]*=scale;
+    }
 
     if (final_fft[fft_history_index][i] > FFT_CEILING) { // Double check we didn't exceed FFT_CEILING
       final_fft[fft_history_index][i] = FFT_CEILING;
@@ -151,7 +173,7 @@ void process_fft() {
       past_index_a += FFT_HISTORY_LEN;
     }
 
-    int16_t past_index_b = fft_history_index - 3;
+    int16_t past_index_b = fft_history_index - 4;
     while (past_index_b < 0) {
       past_index_b += FFT_HISTORY_LEN;
     }
@@ -164,18 +186,16 @@ void process_fft() {
 
     processed_fft[i] = sum / float(FFT_CEILING);
 
-    processed_fft[i] += processed_fft[i];
+    //processed_fft[i] += processed_fft[i];
 
-    //processed_fft[i] *= 1.2;
+    processed_fft[i] *= 1.2;
     if (processed_fft[i] > 1.0) {
       processed_fft[i] = 1.0;
     }
   }
   // Repeat 127 more times
 
-  multiplier_sum = multiplier_smoothed;
-
-  end_timing();
+  multiplier_sum = ((multipliers_smoothed[0] + multipliers_smoothed[1] + multipliers_smoothed[2] + multipliers_smoothed[3]) / 4.0) * 0.02 + (multiplier_sum * 0.98);
 }
 
 
@@ -194,16 +214,16 @@ int16_t interpolate_fft(float index, int16_t* array, uint16_t array_size) {
   return (1 - index_f_frac) * array[index_i] + index_f_frac * array[index_i + 1];
 }
 
-/*
-// Similar to interpolate_fft(), does the same for the six multiplier channels
+
+// Similar to interpolate_fft(), does the same for the four multiplier channels
 float interpolate_multiplier(uint8_t index) {
-  float pos = (index / 127.0) * 5;
+  float pos = (index / 127.0) * 3;
   uint8_t pos_whole = uint8_t(floor(pos));
   uint8_t pos_next  = pos_whole + 1;
   float   pos_fractional = pos - float(pos_whole);
 
-  if (pos_next > 11) {
-    pos_next = 11;
+  if (pos_next > 3) {
+    pos_next = 3;
   }
 
   float mult_a = multipliers_smoothed[pos_whole];
@@ -218,6 +238,5 @@ float interpolate_multiplier(uint8_t index) {
     }
   }
 
-  return (mult_min * AUTORANGE_MIX) + (mult_local * (1.0 - AUTORANGE_MIX));
+  return mult_local;
 }
-*/

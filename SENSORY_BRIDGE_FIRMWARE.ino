@@ -1,4 +1,4 @@
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.1.0"
 
 #include <FastLED.h>
 #include <FS.h>
@@ -6,7 +6,7 @@
 
 enum lightshow_modes {
   DUET_MODE,
-  DUET_MODE_INVERTED,
+  DUET_MODE_LOG,
   BLOOM_MODE,
   WAVEFORM_MODE,
   VU_MODE,
@@ -42,8 +42,8 @@ void loop() {
   if (LIGHTSHOW_MODE == DUET_MODE) {
     duet_mode(false);
   }
-  else if (LIGHTSHOW_MODE == DUET_MODE_INVERTED) {
-    duet_mode(true);
+  else if (LIGHTSHOW_MODE == DUET_MODE_LOG) {
+    duet_mode(false);
   }
   else if (LIGHTSHOW_MODE == BLOOM_MODE) {
     bloom_mode();
@@ -55,10 +55,21 @@ void loop() {
     vu_mode();
   }
 
-  if (MIRROR_ENABLED) {
-    interpolate_scale_leds(0.5);
+  if (MIRROR_ENABLED) {    
+    if (LIGHTSHOW_MODE != BLOOM_MODE) {
+      interpolate_scale_leds(0.5);
+    }
     shift_leds_up(64);
     mirror_image_downwards();
+    
+    if (LIGHTSHOW_MODE == BLOOM_MODE) {
+      fade_edge(true);
+    }
+  }
+  else{
+    if (LIGHTSHOW_MODE == BLOOM_MODE) {
+      fade_edge(false);
+    }
   }
 
   if (!collecting_ambient_noise) {
