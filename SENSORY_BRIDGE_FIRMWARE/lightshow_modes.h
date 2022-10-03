@@ -111,7 +111,10 @@ void waveform_mode() {
     }
 
     final_val = uint8_t(uint16_t(final_val * final_val) >> 8); // gamma correction
-    leds[i] = CHSV((hue) - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0)), 255, final_val);
+
+    float color_val = hue - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0));
+    leds[i] = ColorFromPalette( current_palette, uint8_t(color_val), final_val, LINEARBLEND );
+    //leds[i] = CHSV((hue) - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0)), 255, final_val);
   }
 
   process_color_push();
@@ -146,7 +149,10 @@ void vu_mode() {
     final_val = 255;
   }
   for (uint8_t i = 0; i < uint8_t(out_val); i++) {
-    leds[i] = CHSV((hue) - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0)), 255, final_val);
+    float color_val = (hue) - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0));
+
+    leds[i] = ColorFromPalette( current_palette, uint8_t(color_val), final_val, LINEARBLEND );
+    //leds[i] = CHSV(color_val, 255, final_val);
   }
 }
 
@@ -387,7 +393,12 @@ void bloom_mode() {
     }
   }
 
-  leds_temp[0] = CHSV(hue-(30*fft_sum), 255, 255*fft_sum);
+  uint8_t final_val = 255*fft_sum;
+  float color_val = hue-(30*fft_sum);
+
+  leds_temp[0] = ColorFromPalette( current_palette, uint8_t(color_val), final_val, LINEARBLEND );
+  //leds_temp[0] = CHSV(color_val, 255, final_val);
+  
   load_leds_from_temp();
   save_leds_to_last();
 

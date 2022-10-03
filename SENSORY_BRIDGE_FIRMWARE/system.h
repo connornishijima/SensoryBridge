@@ -65,9 +65,11 @@ void init_bridge() {
   FastLED.show();
 
   uint8_t GRADIENT_HALLOWEEN[] = {
-    0,    255,  0,  155,
-    255,  255,  64,  0,
-    0,    255,  0,  155
+    0,      255,  32,  0,   // Orange
+    63,     255,  32,  0,   // Orange
+    127,    255,  0,   155, // Hint of purple
+    195,    255,  32,  0,   // Orange
+    255,    255,  32,  0,   // Wrap to same orange from index 0
   };
 
   current_palette.loadDynamicGradientPalette( GRADIENT_HALLOWEEN );
