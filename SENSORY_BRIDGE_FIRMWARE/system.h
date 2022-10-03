@@ -49,6 +49,29 @@ void init_serial(uint32_t baud_rate) {
 }
 
 void init_bridge() {
+  // Uncomment/edit one of the following lines for your led strip type.
+  FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, STRIP_LED_COUNT);  // GRB ordering is assumed
+  //FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, STRIP_LED_COUNT);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
+
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB(0, 0, 0);
+    last_fft_frame[i] = 0.01;
+  }
+  for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
+    leds_out[i] = CRGB(0, 0, 0);
+  }
+
+  FastLED.show();
+
+  uint8_t GRADIENT_HALLOWEEN[] = {
+    0,    255,  0,  155,
+    255,  255,  64,  0,
+    0,    255,  0,  155
+  };
+
+  current_palette.loadDynamicGradientPalette( GRADIENT_HALLOWEEN );
+
   noise_button.pin = NOISE_CAL_PIN;
   mode_button.pin = MODE_PIN;
 
@@ -83,22 +106,6 @@ void init_bridge() {
 
   read_config();
   load_dc_offset();
-
-  // Uncomment/edit one of the following lines for your led strip type.
-  FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, STRIP_LED_COUNT);  // GRB ordering is assumed
-  //FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, STRIP_LED_COUNT);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
-
-  for (uint16_t i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB(0, 0, 0);
-    last_fft_frame[i] = 0.01;
-  }
-  for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
-    leds_out[i] = CRGB(0, 0, 0);
-  }
-
-  FastLED.show();
-  delay(500);
 
   for (uint16_t i = 0; i < 128; i++) {
     fft_ambient_noise[i] = 0;
@@ -178,7 +185,7 @@ void check_buttons() {
           for (uint16_t x = 0; x < 128; x++) {
             leds[x] = CRGB(0, 0, 0);
           }
-          uint16_t ir = (STRIP_LED_COUNT-1)-i;
+          uint16_t ir = (STRIP_LED_COUNT - 1) - i;
           leds[ir] = CRGB(0, 255, 255);
           show_leds();
         }

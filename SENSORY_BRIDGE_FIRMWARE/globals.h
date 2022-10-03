@@ -34,6 +34,8 @@ CRGB leds_diffuse[NUM_LEDS];
 CRGB leds_temp[NUM_LEDS]; // Used for effects
 CRGB leds_last[NUM_LEDS]; // Used for keeping LED data between frames
 
+CRGBPalette16 current_palette;
+
 float last_fft_frame[BUFFER_SIZE];
 float hue = 100;
 float hue_push = 0.0;

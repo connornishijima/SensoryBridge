@@ -59,7 +59,10 @@ void duet_mode(bool invert_brightness) {
     //final_val *= 0.75;
     //final_val += 255*0.25;
 
-    leds[i] = CHSV((hue) - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0)), 255, final_val);
+    float color_val = hue - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0));
+
+    leds[i] = ColorFromPalette( current_palette, uint8_t(color_val), final_val, LINEARBLEND );
+    //leds[i] = CHSV(color_val, 255, final_val);
   }
 
   //blur1d( leds, NUM_LEDS, 2 );
@@ -354,6 +357,8 @@ float velocity_mode(bool run_leds) {
 }
 
 void bloom_mode() {
+  static uint32_t iter = 0;
+  iter++;
   float fft_sum = 0.0;
   for (uint8_t i = 0; i < 128; i++) {
     fft_sum += processed_fft[i];
@@ -367,10 +372,19 @@ void bloom_mode() {
 
   fft_sum = fft_sum * fft_sum;
 
-  for (int16_t i = 127; i > 0; i--) {
-    leds_temp[i].r = leds_last[i - 1].r*0.99;
-    leds_temp[i].g = leds_last[i - 1].g*0.99;
-    leds_temp[i].b = leds_last[i - 1].b*0.99;
+  if(iter % 2 == 0){
+    for (int16_t i = 127; i > 0; i--) {
+      leds_temp[i].r = leds_last[i - 1].r*0.995;
+      leds_temp[i].g = leds_last[i - 1].g*0.995;
+      leds_temp[i].b = leds_last[i - 1].b*0.995;
+    }
+  }
+  else{
+    for (int16_t i = 127; i > 0; i--) {
+      leds_temp[i].r = leds_last[i - 1].r;
+      leds_temp[i].g = leds_last[i - 1].g;
+      leds_temp[i].b = leds_last[i - 1].b;
+    }
   }
 
   leds_temp[0] = CHSV(hue-(30*fft_sum), 255, 255*fft_sum);
