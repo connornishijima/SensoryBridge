@@ -232,7 +232,7 @@ float interpolate_multiplier(uint8_t index) {
   float mult_local = ( mult_a * (1.0 - pos_fractional) + mult_b * (pos_fractional) );
 
   float mult_min = 1.0;
-  for (uint8_t i = 0; i < 6; i++) {
+  for (uint8_t i = 0; i < 4; i++) {
     if (multipliers_smoothed[i] < mult_min) {
       mult_min = multipliers_smoothed[i];
     }
