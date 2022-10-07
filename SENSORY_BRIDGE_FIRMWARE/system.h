@@ -50,7 +50,7 @@ void init_serial(uint32_t baud_rate) {
 
 void init_bridge() {
   // Uncomment/edit one of the following lines for your led strip type.
-  FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, STRIP_LED_COUNT);  // GRB ordering is assumed
+  FastLED.addLeds<WS2812B, LED_DATA_PIN, GRB>(leds_out, STRIP_LED_COUNT);
   //FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, STRIP_LED_COUNT);
   FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
   for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
