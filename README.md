@@ -8,13 +8,9 @@ For the latest stable release of the Sensory Bridge firmware, **[visit the Relea
 
 [![CLICK HERE TO SEE A VIDEO DEMO](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/6.jpg?raw=true)](https://www.youtube.com/watch?v=4ALef1g3c2c)
 
---------------------------------------------------------
-
 # SENSORY BRIDGE is **DIFFERENT**
 
 **This isn't the usual "sound-reactive LEDs" you've seen for years.**
-
---------------------------------------------------------
 
 **Sensory Bridge is built from the ground up as an open, powerful bridge between sight and sound.** With a show that's reactive to notation, vibrato and more, it produces very unique and pleasant-to-look-at light shows which synchronize to your music without any visible latency. (A built-in MEMS microphone constantly studies what it hears using the [Fast Fourier Transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform), at more than 60 FPS!)
 
@@ -29,19 +25,13 @@ It has to be seen to be believed, *which the video demos below can help with:*
 
 # 
 
---------------------------------------------------------
-
 ![SENSORY BRIDGE IS SIMPLE](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/2.jpg?raw=true)
 
---------------------------------------------------------
 # SENSORY BRIDGE is **SIMPLE**
---------------------------------------------------------
 
 **Easy controls provide quick access to changing the brightness, audio gain, and smoothing of the display!**
 
---------------------------------------------------------
 ## **KNOBS**
---------------------------------------------------------
 
 ### PHOTONS KNOB
 
@@ -59,9 +49,7 @@ This knob is special. **MOOD** controls *how quickly your LEDs will react to cha
 
 ![KNOBS](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/16.jpg?raw=true)
 
---------------------------------------------------------
 ## **BUTTONS**
---------------------------------------------------------
 
 ### NOISE BUTTON
 
@@ -101,9 +89,7 @@ It's a classic! A bouncing bar graph represents the current loudness of the musi
 
 ![SWEET SPOT](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/3.jpg?raw=true)
 
---------------------------------------------------------
 ## **SWEET SPOT**
---------------------------------------------------------
 
 At the front of the base unit are three LEDs, which indicate if you've set your Boost knob correctly for the music volume and distance! Tune the Boost until the center (green) LED is lit up during an average loudness level of your music. Once set, it shouldn't need to be changed between songs!
 
@@ -111,9 +97,7 @@ At the front of the base unit are three LEDs, which indicate if you've set your 
 
 ![SENSORY BRIDGE IS FLEXIBLE](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/12.jpg?raw=true)
 
---------------------------------------------------------
 # SENSORY BRIDGE is **FLEXIBLE**
---------------------------------------------------------
 
 While compatible with any WS2812B-based LED strip, (just use the screw terminals at the back!) there's also the option of using the **"Mini Mast"**, a dense strip of 128 1.5mm RGB LEDs on a 260mm long PCB! It just plugs directly into the Sensory Bridge accessory port, making for a very portable solution!
 
@@ -121,9 +105,7 @@ While compatible with any WS2812B-based LED strip, (just use the screw terminals
 
 ![SENSORY BRIDGE IS OPEN](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/1.jpg?raw=true)
 
---------------------------------------------------------
 # SENSORY BRIDGE is **OPEN**
---------------------------------------------------------
 
 Powered by an ESP32-S2, Sensory Bridge can be easily reprogrammed for any purpose you'd like! The firmware is [open source](https://github.com/connornishijima/SensoryBridge) under the [MIT License](https://github.com/connornishijima/SensoryBridge/blob/main/LICENSE), so modifying it for your own purposes is quick and easy with the Arduino IDE. You can even download the [board](https://github.com/connornishijima/SensoryBridge/tree/main/extras/OSHW/PCB) and [case STLs](https://github.com/connornishijima/SensoryBridge/tree/main/extras/OSHW/3D%20Printing) to build one yourself!
 
@@ -133,15 +115,11 @@ Powered by an ESP32-S2, Sensory Bridge can be easily reprogrammed for any purpos
 
 ![WHATS INCLUDED](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/8.jpg?raw=true)
 
---------------------------------------------------------
 # WHAT'S **INCLUDED:**
---------------------------------------------------------
 
 For $50, you'll receive a ***fully assembled Sensory Bridge***, with the latest firmware already installed. For $25 extra, you can have a **Mini Mast** (128 micro-LED PCB, seen above) sent as well, with an accompanying brace that provides rigidity. (It just plugs right into the accessory port on top of Sensory Bridge!)
 
---------------------------------------------------------
 # EXTRAS YOU **MIGHT NEED:**
---------------------------------------------------------
 
 ### **PAY CLOSE ATTENTION TO THIS SECTION!**
 
@@ -156,9 +134,7 @@ To save on redundant materials you might already own, **your Sensory Bridge does
 
 ![FUTURE PLANS](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/0.jpg?raw=true)
 
---------------------------------------------------------
 # FUTURE **PLANS**
---------------------------------------------------------
 
 Sensory Bridge is going to undergo some upgrades in the following months! You'll be able to easily update to the latest firmware using the Arduino IDE.
 
@@ -194,28 +170,20 @@ The accessory port exposes GPIO 17/18 of the ESP32-S2, which are analog inputs. 
 
 ![GETTING STARTED GUIDE](https://sensorybridge.rocks/tutorial/img/mast_insert.png)
 
---------------------------------------------------------
 # **GETTING STARTED**
---------------------------------------------------------
 
 The **[GETTING STARTED](https://sensorybridge.rocks/tutorial/) GUIDE** will walk you through the quick-and-easy setup process!
 
---------------------------------------------------------
 # **DISCLAIMER**
---------------------------------------------------------
 
 ## **Those with [Photosensitive Epilepsy](https://en.wikipedia.org/wiki/Photosensitive_epilepsy) (PSE) should NOT purchase, operate, or otherwise view Sensory Bridge under any condition.**
 
 ## **The seller assumes no legal liability for injury caused to persons with PSE that have ignored this warning.**
 
---------------------------------------------------------
 # **SPONSORS**
---------------------------------------------------------
 
 - **[mlctrez](https://github.com/mlctrez)**
 
---------------------------------------------------------
 # **CREDITS**
---------------------------------------------------------
 
 **Developed by Connor Nishijima for Lixie Labs (2022)**
