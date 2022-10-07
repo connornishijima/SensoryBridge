@@ -3,6 +3,9 @@
 #include <FastLED.h>
 #include <FS.h>
 #include <LittleFS.h>
+#include "cdcusb.h"
+
+CDCusb USBSerial;
 
 enum lightshow_modes {
   DUET_MODE,
@@ -18,6 +21,7 @@ enum lightshow_modes {
 #include "configuration.h"
 #include "constants.h"
 #include "globals.h"
+#include "USB_handler.h"
 #include "led_utilities.h"
 #include "noise_cal.h"
 #include "i2s.h"
