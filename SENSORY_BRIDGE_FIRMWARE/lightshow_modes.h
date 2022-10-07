@@ -1,12 +1,7 @@
-void duet_mode(bool invert_brightness);
+void duet_mode();
 void bloom_mode();
 
-void duet_mode(bool invert_brightness) {
-  //AUTORANGE_MIX = 0.0;
-  if (!invert_brightness) {
-    //change_contrast_float(processed_fft, 110);
-  }
-
+void duet_mode() {
   float velocity_sum = 0;
   uint8_t max_val = 0;
   for (uint16_t i = 0; i < 128; i++) {
