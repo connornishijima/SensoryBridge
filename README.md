@@ -212,4 +212,10 @@ The **[GETTING STARTED](https://sensorybridge.rocks/tutorial/) GUIDE** will walk
 # **SPONSORS**
 --------------------------------------------------------
 
-- [mlctrez](https://github.com/mlctrez)
+- **[mlctrez](https://github.com/mlctrez)**
+
+--------------------------------------------------------
+# **CREDITS**
+--------------------------------------------------------
+
+**Developed by Connor Nishijima for Lixie Labs (2022)**
