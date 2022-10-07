@@ -53,16 +53,18 @@ void init_bridge() {
   FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, STRIP_LED_COUNT);  // GRB ordering is assumed
   //FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, STRIP_LED_COUNT);
   FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
-
-  for (uint16_t i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB(0, 0, 0);
-    last_fft_frame[i] = 0.01;
-  }
   for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
     leds_out[i] = CRGB(0, 0, 0);
   }
 
   FastLED.show();
+
+  init_usb();
+
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB(0, 0, 0);
+    last_fft_frame[i] = 0.01;
+  }
 
   uint8_t GRADIENT_HALLOWEEN[] = {
     0,      255,  32,  0,   // Orange
