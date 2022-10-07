@@ -2,7 +2,6 @@ void  process_fft();
 int16_t interpolate_fft(float index, int16_t* array, uint16_t array_size);
 float interpolate_multiplier(uint8_t index);
 
-
 void process_fft() {
   static uint32_t iter = 0;
   iter++;
@@ -156,8 +155,6 @@ void process_fft() {
       final_fft[fft_history_index][i] = FFT_CEILING;
     }
 
-    //final_fft[fft_history_index][i] = final_fft[fft_history_index][i]  / float(FFT_CEILING); // Convert the FFT bin to a 0.0 - 1.0 float range
-
     int16_t past_index = fft_history_index - 5;
     while (past_index < 0) {
       past_index += FFT_HISTORY_LEN;
@@ -185,8 +182,6 @@ void process_fft() {
     sum = sum / 3;
 
     processed_fft[i] = sum / float(FFT_CEILING);
-
-    //processed_fft[i] += processed_fft[i];
 
     processed_fft[i] *= 1.2;
     if (processed_fft[i] > 1.0) {

@@ -6,6 +6,7 @@
 #include <LittleFS.h>
 #include "cdcusb.h"
 
+// CDC class definition
 CDCusb USBSerial;
 
 // Used to reference modes by name in code
