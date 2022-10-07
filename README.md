@@ -1,3 +1,11 @@
+--------------------------------------------------------
+
+### NOTE: This repo is used for active development.
+
+For the latest stable release of the Sensory Bridge firmware, **[visit the Releases page](https://github.com/connornishijima/SensoryBridge/releases)**! (Cloning straight from this repo is much like a "nightly" build, and may be broken code!)
+
+--------------------------------------------------------
+
 [![CLICK HERE TO SEE A VIDEO DEMO](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/6.jpg?raw=true)](https://www.youtube.com/watch?v=4ALef1g3c2c)
 
 --------------------------------------------------------
