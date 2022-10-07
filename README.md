@@ -207,3 +207,9 @@ The **[GETTING STARTED](https://sensorybridge.rocks/tutorial/) GUIDE** will walk
 ## **Those with [Photosensitive Epilepsy](https://en.wikipedia.org/wiki/Photosensitive_epilepsy) (PSE) should NOT purchase, operate, or otherwise view Sensory Bridge under any condition.**
 
 ## **The seller assumes no legal liability for injury caused to persons with PSE that have ignored this warning.**
+
+--------------------------------------------------------
+# **SPONSORS**
+--------------------------------------------------------
+
+- [mlctrez](https://github.com/mlctrez)
