@@ -183,6 +183,7 @@ The **[GETTING STARTED](https://sensorybridge.rocks/tutorial/) GUIDE** will walk
 # **SPONSORS**
 
 - **[mlctrez](https://github.com/mlctrez)**
+- **[zxcasd](https://github.com/zxcasd-zxcasd)**
 
 # **CREDITS**
 
