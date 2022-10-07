@@ -206,7 +206,7 @@ int16_t interpolate_fft(float index, int16_t* array, uint16_t array_size) {
     right_val = left_val;
   }
 
-  return (1 - index_f_frac) * array[index_i] + index_f_frac * array[index_i + 1];
+  return left_val * (1 - index_f_frac) + right_val * index_f_frac;
 }
 
 

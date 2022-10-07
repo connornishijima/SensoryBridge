@@ -51,7 +51,7 @@ void capture_audio() {
 
   i2s_read(I2S_PORT, i2s_samples_raw, BUFFER_SIZE * 4, &bytes_read, portMAX_DELAY);
   for (uint16_t i = 0; i < BUFFER_SIZE; i++) {
-    (i2s_samples[i2s_history_index][i] = (((i2s_samples_raw[i] / 1000000.0) + 110) * 128) + 3000)*4;
+    i2s_samples[i2s_history_index][i] = ((((i2s_samples_raw[i] / 1000000.0) + 110) * 128) + 3000)*4;
 
     if (i2s_samples[i2s_history_index][i] > 32767) {
       i2s_samples[i2s_history_index][i] = 32767;
