@@ -187,6 +187,8 @@ void process_fft() {
     if (processed_fft[i] > 1.0) {
       processed_fft[i] = 1.0;
     }
+
+    //processed_fft[i] *= processed_fft[i];
   }
   // Repeat 127 more times
 

@@ -5,12 +5,11 @@ void duet_mode() {
   for (uint16_t i = 0; i < 128; i++) {
     float fft_val = processed_fft[i];
 
-    float out_val = ( fft_val ) * 255.0;
+    float out_val = (fft_val)*255.0;
 
     if (out_val < 127) {
       //out_val = 0;
-    }
-    else {
+    } else {
       //out_val = 255;
     }
 
@@ -26,16 +25,19 @@ void duet_mode() {
 
     if (final_val < 0.0) {
       final_val = 0.0;
-    }
-    else if (final_val > 255.0) {
+    } else if (final_val > 255.0) {
       final_val = 255.0;
     }
 
-    uint8_t smooth_threshold = 100 - (100 * SMOOTHING);
+    float gamma_val = uint16_t((uint8_t(final_val) * uint8_t(final_val)) >> 8);
+    final_val = gamma_val;
+
+    uint8_t smooth_threshold = 50 - (50 * SMOOTHING);
     if (abs(final_val - last_fft_frame[i]) > smooth_threshold) {
       if (final_val > last_fft_frame[i]) {
         final_val = last_fft_frame[i] + smooth_threshold;
       }
+      
       else if (final_val < last_fft_frame[i]) {
         final_val = last_fft_frame[i] - smooth_threshold;
       }
@@ -43,15 +45,17 @@ void duet_mode() {
 
     last_fft_frame[i] = final_val;
 
-    float gamma_val = uint16_t( (uint8_t(final_val) * uint8_t(final_val)) >> 8 );
-    final_val = gamma_val;
-
     //final_val *= 0.75;
     //final_val += 255*0.25;
 
     float color_val = hue - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0));
 
-    leds[i] = ColorFromPalette( current_palette, uint8_t(color_val), final_val, LINEARBLEND );
+    leds[i] = ColorFromPalette(
+      current_palette,
+      uint8_t(color_val),
+      final_val,
+      LINEARBLEND
+    );
     //leds[i] = CHSV(color_val, 255, final_val);
   }
 
@@ -70,20 +74,19 @@ void bloom_mode() {
   fft_sum /= 128.0;
 
   fft_sum *= 1.5;
-  if(fft_sum > 1.0){
+  if (fft_sum > 1.0) {
     fft_sum = 1.0;
   }
 
   fft_sum = fft_sum * fft_sum;
 
-  if(iter % 2 == 0){
+  if (iter % 2 == 0) {
     for (int16_t i = 127; i > 0; i--) {
-      leds_temp[i].r = leds_last[i - 1].r*0.995;
-      leds_temp[i].g = leds_last[i - 1].g*0.995;
-      leds_temp[i].b = leds_last[i - 1].b*0.995;
+      leds_temp[i].r = leds_last[i - 1].r * 0.995;
+      leds_temp[i].g = leds_last[i - 1].g * 0.995;
+      leds_temp[i].b = leds_last[i - 1].b * 0.995;
     }
-  }
-  else{
+  } else {
     for (int16_t i = 127; i > 0; i--) {
       leds_temp[i].r = leds_last[i - 1].r;
       leds_temp[i].g = leds_last[i - 1].g;
@@ -91,12 +94,12 @@ void bloom_mode() {
     }
   }
 
-  uint8_t final_val = 255*fft_sum;
-  float color_val = hue-(30*fft_sum);
+  uint8_t final_val = 255 * fft_sum;
+  float color_val = hue - (30 * fft_sum);
 
-  leds_temp[0] = ColorFromPalette( current_palette, uint8_t(color_val), final_val, LINEARBLEND );
+  leds_temp[0] = ColorFromPalette(current_palette, uint8_t(color_val), final_val, LINEARBLEND);
   //leds_temp[0] = CHSV(color_val, 255, final_val);
-  
+
   load_leds_from_temp();
   save_leds_to_last();
 
@@ -121,8 +124,7 @@ void waveform_mode() {
 
     if (sample < -32767) {
       sample = -32767;
-    }
-    else if (sample > 32767) {
+    } else if (sample > 32767) {
       sample = 32767;
     }
 
@@ -145,10 +147,10 @@ void waveform_mode() {
       final_val = 255;
     }
 
-    final_val = uint8_t(uint16_t(final_val * final_val) >> 8); // gamma correction
+    final_val = uint8_t(uint16_t(final_val * final_val) >> 8);  // gamma correction
 
     float color_val = hue - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0));
-    leds[i] = ColorFromPalette( current_palette, uint8_t(color_val), final_val, LINEARBLEND );
+    leds[i] = ColorFromPalette(current_palette, uint8_t(color_val), final_val, LINEARBLEND);
     //leds[i] = CHSV((hue) - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0)), 255, final_val);
   }
 
@@ -169,8 +171,7 @@ void vu_mode() {
   if (fabs(out_val - fft_sum_last) > max_push) {
     if (out_val > fft_sum_last) {
       out_val = fft_sum_last + max_push;
-    }
-    else if (out_val < fft_sum_last) {
+    } else if (out_val < fft_sum_last) {
       out_val = fft_sum_last - max_push;
     }
   }
@@ -185,10 +186,9 @@ void vu_mode() {
     final_val = 255;
   }
   for (uint8_t i = 0; i < uint8_t(out_val); i++) {
-    float color_val = (hue) - uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0));
+    float color_val = (hue)-uint8_t(uint16_t(final_val * final_val) >> 8) * (0.1 + (hue_push / 10.0) * 0.8) + (i * hue_shift_amount) - (32 * (final_val / 255.0));
 
-    leds[i] = ColorFromPalette( current_palette, uint8_t(color_val), final_val, LINEARBLEND );
+    leds[i] = ColorFromPalette(current_palette, uint8_t(color_val), final_val, LINEARBLEND);
     //leds[i] = CHSV(color_val, 255, final_val);
   }
 }
-

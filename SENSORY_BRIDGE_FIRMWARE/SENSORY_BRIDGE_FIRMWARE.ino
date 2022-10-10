@@ -5,9 +5,13 @@
 #include <FS.h>
 #include <LittleFS.h>
 #include "cdcusb.h"
+#include <WiFiManager.h>
+#include <HTTPClient.h>
+#include <WebSocketsServer.h>
 
 // CDC class definition
 CDCusb USBSerial;
+WebSocketsServer webSocket = WebSocketsServer(81);
 
 // Used to reference modes by name in code
 enum lightshow_modes {
@@ -25,6 +29,7 @@ enum lightshow_modes {
 #include "configuration.h"
 #include "constants.h"
 #include "globals.h"
+#include "wifi_handler.h"
 #include "USB_handler.h"
 #include "led_utilities.h"
 #include "noise_cal.h"
@@ -41,6 +46,8 @@ void loop() {
   // Check if inputs changed (system.h)
   check_knobs();
   check_buttons();
+
+  wifi_loop();
 
   // Check we're hitting the Sweet Spot (system.h)
   check_sweet_spot();

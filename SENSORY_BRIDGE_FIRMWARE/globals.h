@@ -66,10 +66,6 @@ float multipliers_smoothed[4] = {0.01,0.01,0.01,0.01};
 uint16_t multiplier_centers[4]   = {16, 48, 80, 112};
 uint16_t multiplier_bounds[4][2] = {{0,31}, {32, 63}, {64,95}, {96, 127}};
 
-String current_section = "section_name";
-uint32_t section_start = 0;
-uint32_t section_end   = 0;
-
 bool warn = false;
 bool debug_mode = false;
 
@@ -77,6 +73,9 @@ int32_t DC_OFFSET =  0.0;
 
 uint32_t last_setting_change = 0;
 bool settings_updated = false;
+uint8_t current_brightness = 0;
+
+uint32_t chip_id = 0;
 
 struct button{
   uint8_t pin = 0;

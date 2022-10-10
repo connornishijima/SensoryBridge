@@ -61,6 +61,17 @@ void init_bridge() {
 
   init_usb();
 
+  if(init_wifi()){
+    Serial.println("CONNECTED TO WIFI");
+    discovery_check_in();
+  }
+  else{
+    Serial.println("FAILED TO CONNECT TO WIFI");
+  }
+
+  webSocket.begin();
+  webSocket.onEvent(webSocketEvent);
+
   for (uint16_t i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB(0, 0, 0);
     last_fft_frame[i] = 0.01;
@@ -74,7 +85,7 @@ void init_bridge() {
     255,    255,  32,  0,   // Wrap to same orange from index 0
   };
 
-  current_palette.loadDynamicGradientPalette( GRADIENT_HALLOWEEN );
+  current_palette = RainbowColors_p; //.loadDynamicGradientPalette( GRADIENT_HALLOWEEN );
 
   noise_button.pin = NOISE_CAL_PIN;
   mode_button.pin = MODE_PIN;
@@ -301,7 +312,8 @@ void check_knobs() {
     FFT_CEILING = (SENSITIVITY) * (sensitivity_high - sensitivity_low) / (1.0) + sensitivity_low;
     //Serial.println(FFT_CEILING);
 
-    FastLED.setBrightness(uint8_t(BRIGHTNESS * 255));
+    current_brightness = uint8_t(BRIGHTNESS * 255);
+    FastLED.setBrightness(current_brightness);
   }
   /*
     Serial.print(BRIGHTNESS,6);
