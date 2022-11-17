@@ -1,3 +1,7 @@
+/*----------------------------------------
+  Sensory Bridge FILESYSTEM ACCESS
+----------------------------------------*/
+
 void factory_reset() {
   Serial.print("Deleting config.bin: ");
   if (LittleFS.remove("/config.bin")) {

@@ -1,3 +1,7 @@
+/*----------------------------------------
+  Sensory Bridge UART COMMAND LINE
+----------------------------------------*/
+
 void init_serial(uint32_t baud_rate) {
   Serial.begin(baud_rate);
   bool timeout = false;

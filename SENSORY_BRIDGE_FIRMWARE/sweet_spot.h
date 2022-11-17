@@ -1,3 +1,7 @@
+/*----------------------------------------
+  Sensory Bridge "SWEET SPOT" LEDS
+----------------------------------------*/
+
 void init_sweet_spot(){
   ledcSetup(0, 500, 12);
   ledcAttachPin(SWEET_SPOT_LEFT_PIN, 0);
