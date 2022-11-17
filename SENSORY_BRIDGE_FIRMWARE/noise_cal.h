@@ -1,203 +1,76 @@
-void print_bits(uint8_t input) {
-  for (uint8_t i = 0; i < 8; i++) {
-    Serial.print( bitRead(input, 7 - i) );
+/*----------------------------------------
+  Sensory Bridge NOISE CAL FUNCTIONS
+----------------------------------------*/
+
+void calculate_ambient_noise_average() {
+  float avg_value = 0.0;
+
+  for (uint16_t i = 0; i < 128; i++) {
+    ambient_samples[i] /= ambient_frames_collected;
+    avg_value += ambient_samples[i];
   }
+  avg_value /= 128.0;
+
+  CONFIG.DC_OFFSET /= float(ambient_frames_collected);
+  CONFIG.WAVEFORM_NOISE_FLOOR /= float(ambient_frames_collected);
 }
 
-void print_bits(uint32_t input) {
-  for (uint8_t i = 0; i < 32; i++) {
-    Serial.print( bitRead(input, 31 - i) );
+void start_noise_cal() {
+  for (uint8_t i = 0; i < 128; i++) {
+    ambient_samples[i] = 0;
   }
+  clear_all_led_buffers();
+  show_leds();
+  ambient_start_time = millis();
+  ambient_solve_time = ambient_start_time + 3000;
+  ambient_frames_collected = 0;
 }
 
 void show_progress_bar(float progress, CRGB col) {
-  for (uint8_t i = 0; i < 128; i++) {
-    leds[i] = CRGB(0,0,0);
+  if(millis() < ambient_start_time+50){
+    progress = 0.0;
   }
-  uint16_t end_led = 128 * progress;
+
+  for (uint8_t i = 0; i < 128; i++) {
+    leds[i] = CRGB(0, 0, 0);
+  }
+  int16_t end_led = 127 * progress;
   float max_val = 0.0;
   for (uint8_t i = 0; i < 128; i++) {
-    if (fft_ambient_noise[i] > max_val) {
-      max_val = fft_ambient_noise[i];
+    if (ambient_samples[i/2] > max_val) {
+      max_val = ambient_samples[i/2];
     }
   }
-  for (uint8_t i = 0; i < 128; i++) {
+  for (int i = 0; i <= end_led; i++) {
     if (i == end_led) {
       leds[i] = col;
-    }
-    else if(i < end_led){
-      float out_val = (fft_ambient_noise[i] / max_val);
-      // out_val = out_val * out_val;
-      leds[i] = CHSV(16,255,255 * out_val);
+    } else{
+      float out_val = (ambient_samples[i/2] / max_val);
+      leds[i] = CHSV(16, 255, 255 * out_val);
     }
   }
-
-  show_leds();
 }
 
-void load_ambient_noise_calibration() {
-  if (debug_mode) {
-    Serial.println("LOADING AMBIENT_NOISE PROFILE...");
-  }
-  File file = LittleFS.open("/noise_cal.bin", FILE_READ);
-  if (!file) {
-    if (debug_mode) {
-      Serial.println("- failed to open file for reading");
+void run_noise_cal(uint32_t t_now) {
+  if (collecting_ambient_noise == true) {
+    float progress = (t_now - ambient_start_time) / float(ambient_solve_time - ambient_start_time);
+    show_progress_bar(progress, CRGB(0, 255, 255));
+    if (t_now >= ambient_solve_time) {
+      collecting_ambient_noise = false;
+      calculate_ambient_noise_average();
+      save_ambient_noise_calibration();
+      save_config();
     }
-    return;
+
+    show_leds();
   }
+}
 
-  bytes_32 temp;
-
-  file.seek(0);
+void clear_noise_cal() {
   for (uint16_t i = 0; i < 128; i++) {
-    temp.bytes[0] = file.read();
-    temp.bytes[1] = file.read();
-    temp.bytes[2] = file.read();
-    temp.bytes[3] = file.read();
-
-    if (debug_mode) {
-      if (i < 8) {
-        print_bits(temp.bytes[0]);
-        print_bits(temp.bytes[1]);
-        print_bits(temp.bytes[2]);
-        print_bits(temp.bytes[3]);
-        Serial.println();
-      }
-    }
-
-    fft_ambient_noise[i] = temp.long_val;
+    ambient_samples[i] = 0;
   }
-
-  file.close();
-  if (debug_mode) {
-    Serial.println("LOAD COMPLETE");
-  }
-}
-
-void load_dc_offset() {
-  if (debug_mode) {
-    Serial.println("LOADING DC OFFSET...");
-  }
-  File file = LittleFS.open("/dc_offset.bin", FILE_READ);
-  if (!file) {
-    if (debug_mode) {
-      Serial.println("- failed to open file for reading");
-    }
-    return;
-  }
-
-  bytes_32 temp;
-
-  file.seek(0);
-  temp.bytes[0] = file.read();
-  temp.bytes[1] = file.read();
-  temp.bytes[2] = file.read();
-  temp.bytes[3] = file.read();
-
-  DC_OFFSET = temp.long_val_signed;
-
-  file.close();
-  if (debug_mode) {
-    Serial.println("LOAD COMPLETE");
-  }
-}
-
-void save_ambient_noise_calibration() {
-  if (debug_mode) {
-    Serial.println("SAVING AMBIENT_NOISE PROFILE...");
-  }
-  File file = LittleFS.open("/noise_cal.bin", FILE_WRITE);
-  if (!file) {
-    if (debug_mode) {
-      Serial.println("- failed to open file for writing");
-    }
-    return;
-  }
-
-  bytes_32 temp;
-
-  file.seek(0);
-  for (uint16_t i = 0; i < 128; i++) {
-    uint32_t in_val = fft_ambient_noise[i];
-
-    temp.long_val = in_val;
-
-    file.write( temp.bytes[0] );
-    file.write( temp.bytes[1] );
-    file.write( temp.bytes[2] );
-    file.write( temp.bytes[3] );
-
-    if (debug_mode) {
-      if (i < 8) {
-        print_bits(temp.bytes[0]);
-        print_bits(temp.bytes[1]);
-        print_bits(temp.bytes[2]);
-        print_bits(temp.bytes[3]);
-        Serial.println();
-      }
-    }
-  }
-
-  file.close();
-  if (debug_mode) {
-    Serial.println("SAVE COMPLETE");
-  }
-}
-
-void save_dc_offset() {
-  if (debug_mode) {
-    Serial.println("SAVING DC OFFSET...");
-  }
-  File file = LittleFS.open("/dc_offset.bin", FILE_WRITE);
-  if (!file) {
-    if (debug_mode) {
-      Serial.println("- failed to open file for writing");
-    }
-    return;
-  }
-
-  bytes_32 temp;
-
-  file.seek(0);
-  temp.long_val_signed = DC_OFFSET;
-
-  file.write( temp.bytes[0] );
-  file.write( temp.bytes[1] );
-  file.write( temp.bytes[2] );
-  file.write( temp.bytes[3] );
-
-  file.close();
-  if (debug_mode) {
-    Serial.println("SAVE COMPLETE");
-  }
-}
-
-void run_ambient_noise_calibration() {
-  if (ambient_noise_samples_collected < AMBIENT_NOISE_SAMPLES) {
-    float collection_progress = ambient_noise_samples_collected / float(AMBIENT_NOISE_SAMPLES);
-    show_progress_bar(collection_progress, CRGB(0, 255, 255));
-
-    for (uint16_t i = 0; i < 128; i++) {
-      if (fft_integer[i] > fft_ambient_noise[i]) {
-        fft_ambient_noise[i] = fft_integer[i];
-      }
-    }
-    ambient_noise_samples_collected++;
-  }
-  else if (ambient_noise_samples_collected >= AMBIENT_NOISE_SAMPLES) {
-    collecting_ambient_noise = false;
-
-    DC_OFFSET /= float(AMBIENT_NOISE_SAMPLES);
-
-    Serial.print("DC OFFSET: ");
-    Serial.println(DC_OFFSET);
-
-    if (debug_mode) {
-      Serial.println("AMBIENT NOISE COLLECTION COMPLETE.");
-    }
-
-    save_ambient_noise_calibration();
-    save_dc_offset();
-  }
+  save_config();
+  save_ambient_noise_calibration();
+  Serial.println("CLEARED AMBIENT NOISE CALIBRATION!");
 }

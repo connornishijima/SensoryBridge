@@ -29,6 +29,7 @@
 */
 #include <Arduino.h>
 #include "ESP32_fft.h"
+
 /*
  * Constructor Prepare an FFT of correct size and types.
  *
@@ -133,17 +134,41 @@ void ESP_fft::removeDC() {
 //
 //
 void ESP_fft::hammingWindow() {
+  static bool printed = true;
+  bool printing_now = false;
+
+  if(printed == false){
+    if(millis() > 30000){
+      printing_now = true;
+      printed = true;
+    }
+  }
 
   float samplesMinusOne = (float(_size) - 1.0);
+
+  if(printing_now){
+    Serial.print("LENGTH: ");
+    Serial.println((_size >> 1));
+    Serial.println();
+  }
+
   for (uint16_t i = 0; i < (_size >> 1); i++) {
     float indexMinusOne = float(i);
     float ratio = (indexMinusOne / samplesMinusOne);
 	
     float weighingFactor = 0.54 - (0.46 * cos(TWOPI * ratio));
-    //float weighingFactor = 0.35875 - (0.48829 * (cos(TWOPI * ratio))) + (0.14128 * (cos(FOURPI * ratio))) - (0.01168 * (cos(SIXPI * ratio)));
+
+    if(printing_now){
+      Serial.print(weighingFactor, 8);
+      Serial.print(", ");
+    }
 	
     _input[i] *= weighingFactor;
     _input[_size - (i + 1)] *= weighingFactor;
+  }
+
+  if(printing_now){
+    Serial.println("\n\n");
   }
 }
 

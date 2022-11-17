@@ -1,3 +1,7 @@
+/*----------------------------------------
+  Sensory Bridge LED UTILITY FUNCTIONS
+----------------------------------------*/
+
 void change_contrast_float(float* arr, int16_t contrast);
 uint8_t truncate_8_bit(float input);
 float truncate_float(float input);
@@ -36,10 +40,6 @@ void load_leds_from_temp() {
 
 
 void show_leds() {
-  if (debug_mode) {
-    run_warning_led();
-  }
-
   if (STRIP_LED_COUNT == 128) {
     memcpy(leds_out, leds, sizeof(leds));
   }
@@ -50,8 +50,6 @@ void show_leds() {
     }
   }
   FastLED.show();
-
-  current_frame++;
 }
 
 
@@ -98,6 +96,13 @@ void interpolate_scale_leds(float scale) {
   load_leds_from_temp();
 }
 
+void scale_image_to_half() {
+  for (uint16_t i = 0; i < 64; i++) {
+    leds_temp[i] = leds[i*2];
+  }
+  load_leds_from_temp();
+}
+
 
 void flip_image() {
   for (uint8_t i = 0; i < 128; i++) {
@@ -129,7 +134,7 @@ CRGB lerp_led(float index, CRGB * led_array) {
 
 
 void shift_leds_up(uint16_t offset) {
-  for (int16_t i = NUM_LEDS - 1; i >= 0; i--) {
+  for (int16_t i = 128 - 1; i >= 0; i--) {
     leds_temp[i] = leds[i - offset];
   }
 
@@ -141,7 +146,7 @@ void shift_leds_up(uint16_t offset) {
 
 
 void shift_leds_down(uint16_t offset) {
-  for (int16_t i = 0; i < NUM_LEDS; i++) {
+  for (int16_t i = 0; i < 128; i++) {
     leds_temp[i] = leds[i + offset];
   }
 
@@ -153,8 +158,8 @@ void shift_leds_down(uint16_t offset) {
 
 void fade_edge(bool symmetry) {
   save_leds_to_temp();
-  for (int16_t i = 0; i < 32; i++) {
-    float prog = i / 31.0;
+  for (int16_t i = 0; i < 16; i++) {
+    float prog = i / 15.0;
 
     leds_temp[127 - i].r *= prog;
     leds_temp[127 - i].g *= prog;
@@ -187,68 +192,9 @@ void mirror_image_downwards() {
   load_leds_from_temp();
 }
 
-
-void fade_edges(uint8_t width) {
-  for (uint8_t i = 0; i < width; i++) {
-    float progress = i / float(width);
-    progress *= progress;
-
-    leds[i].r *= progress;
-    leds[i].g *= progress;
-    leds[i].b *= progress;
-
-    leds[127 - i].r *= progress;
-    leds[127 - i].g *= progress;
-    leds[127 - i].b *= progress;
-  }
-}
-
-
-void process_color_push() {
-  float velocity_sum = 0.0;
-  for (uint16_t i = 0; i < 128; i++) {
-    float velocity = fft_velocities[i];
-    if (velocity < 0.20) {
-      velocity = 0.0;
-    }
-    velocity_sum += velocity;
-  }
-
-  float push_velocity = velocity_sum / 128.0;
-  if (push_velocity > 1.0) {
-    push_velocity = 1.0;
-  }
-
-  push_velocity *= push_velocity;
-  push_velocity *= push_velocity;
-  push_velocity *= 32.0;
-
-  push_velocity *= (((1.0 - SMOOTHING) * 0.25) + 0.75);
-
-  //Serial.println(push_velocity);
-
-  if (push_velocity > hue_push) {
-    hue_push = push_velocity;
-  }
-  else {
-    hue_push *= 0.98;
-  }
-
-  if (hue_push > 20.0) {
-    hue_push = 20.0;
-  }
-
-  if (hue_push < 0.01) {
-    hue_push = 0.01;
-  }
-
-  hue -= hue_push;
-}
-
 void clear_all_led_buffers() {
   for (uint8_t i = 0; i < 128; i++) {
     leds[i] = CRGB(0,0,0);
-    leds_diffuse[i] = CRGB(0,0,0);
     leds_temp[i] = CRGB(0,0,0);
     leds_last[i] = CRGB(0,0,0);
   }
@@ -258,12 +204,63 @@ void clear_all_led_buffers() {
   }
 }
 
-void run_warning_led() {
-  if (warn == true) {
-    leds[NUM_LEDS - 1] = CRGB(255, 0, 0);
-    warn = false;
+void process_color_push(){
+  fft_velocity *= 1.5;
+  if (fft_velocity > 128.0) {
+    fft_velocity = 128.0;
   }
-  else {
-    leds[NUM_LEDS - 1] = CRGB(0, 0, 0);
+  fft_velocity /= 128.0;
+  fft_velocity *= fft_velocity;
+  fft_velocity *= fft_velocity;
+  fft_velocity *= fft_velocity;
+
+  if (fft_velocity < 0.25) {
+    fft_velocity = 0.00;
+  }
+
+  fft_velocity *= 8.0;
+
+  if (fft_velocity > hue_push) {
+    hue_push = fft_velocity;
+  }
+
+  if(CONFIG.IS_MAIN_UNIT || main_override){
+    if(CONFIG.CHROMA >= 0.95){ // Highest 5% on the knobs sets color to automatic push
+        CONFIG.BASE_HUE += hue_push;
+        CONFIG.BASE_HUE += 0.025;
+    }
+    else{
+      float hue_level = CONFIG.CHROMA * 1.0526315; // Makes lower 95% of the knob occupy 100% of the color wheel
+      CONFIG.BASE_HUE = 255*hue_level;
+    }
+  }
+
+  float first_pos = hue_scatter[0];
+  for (uint8_t i = 0; i < 127; i++) {
+    hue_scatter[i] = hue_scatter[i + 1];
+  }
+  hue_scatter[127] = first_pos;
+
+  hue_push *= 0.94;
+}
+
+void blocking_flash(CRGB col){
+  for(uint8_t i = 0; i < 128; i++){
+    leds[i] = CRGB(0,0,0);
+  }
+  
+  const uint8_t flash_times = 2;
+  for(uint8_t f = 0; f < flash_times; f++){
+    for(uint8_t i = 0+48; i < 128-48; i++){
+      leds[i] = col;
+    }
+    show_leds();
+    delay(150);
+
+    for(uint8_t i = 0; i < 128; i++){
+      leds[i] = CRGB(0,0,0);
+    }
+    show_leds();
+    delay(150);
   }
 }
