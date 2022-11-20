@@ -92,7 +92,7 @@ void check_serial(uint32_t t_now) {
     if (c == '\n') {
       // Command recieved
       parse_command(command_buf);
-      memset(&command_buf, sizeof(char) * 64, 0);
+      memset(&command_buf, 0, sizeof(char) * 64);
       command_buf_index = 0;
     } else {
       command_buf[command_buf_index] = c;

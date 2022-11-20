@@ -16,8 +16,8 @@ float interpolate(float index, float* array, uint16_t array_size) {
     right_val = left_val;
   }
 
-  return (1 - index_f_frac) * array[index_i]
-         + index_f_frac * array[index_i + 1];
+  return (1 - index_f_frac) * left_val
+         + index_f_frac * right_val;
 }
 
 void smooth_fft_graph() {
