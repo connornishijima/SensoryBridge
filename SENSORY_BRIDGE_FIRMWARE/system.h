@@ -32,7 +32,7 @@ void swap (float *a, float *b){
 void randomize ( float arr[], int n ){
     // Use a different seed value so that we don't get same
     // result each time we run this program
-    randomSeed(analogRead(10));
+    randomSeed(analogRead(RNG_SEED_PIN));
  
     // Start from the last element and swap one by one. We don't
     // need to run for the first element that's why i > 0
@@ -51,9 +51,14 @@ void init_system(){
 
   init_serial(500000);
 
-  FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, STRIP_LED_COUNT);  // GRB ordering is assumed
-  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
+  if(USE_CLK_PIN == false){
+    FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, STRIP_LED_COUNT);  // GRB ordering is assumed
+  }
+  else{
+    FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, STRIP_LED_COUNT);
+  }
 
+  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
   FastLED.setBrightness(0); // Slowly fade in soon
 
   for (uint16_t i = 0; i < 128; i++) {

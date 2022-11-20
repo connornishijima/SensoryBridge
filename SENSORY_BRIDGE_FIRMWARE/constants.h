@@ -16,7 +16,10 @@
 #define I2S_LRCLK_PIN 34
 #define I2S_DOUT_PIN  35
 
-#define LED_DATA_PIN 36
+#define LED_DATA_PIN  36
+#define LED_CLOCK_PIN 37
+
+#define RNG_SEED_PIN 10
 
 #define SWEET_SPOT_LEFT_PIN    7
 #define SWEET_SPOT_CENTER_PIN  8
