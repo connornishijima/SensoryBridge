@@ -2,6 +2,9 @@
   Sensory Bridge P2P NETWORK FUNCTIONS
 ----------------------------------------*/
 
+// Fully documenting the P2P functions is a TODO for now.
+// Sorry!
+
 const uint8_t broadcast_address[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 esp_now_peer_info_t broadcast_peer;
 bool flashing_flag = false;
@@ -72,6 +75,7 @@ void sync_settings(uint32_t t_now) {
 }
 
 void identify_main_unit() {
+  Serial.println("[IDENTIFY MAIN UNIT]");
   SB_COMMAND_IDENTIFY_MAIN identify;
 
   const uint8_t *peer_addr = broadcast_peer.peer_addr;
@@ -116,11 +120,13 @@ void on_data_rx(const uint8_t *mac_addr, const uint8_t *incoming_data, int len) 
   if (strcmp(data_type, "SBC") == 0) {
     uint8_t command_type = incoming_data[4];
 
-    //Serial.print("RX COMMAND OF TYPE ");
-    //Serial.print(command_type);
-    //Serial.print(" FROM ");
-    //print_mac(mac_addr);
-    //Serial.println();
+#if DEBUG_MODE == 1
+    Serial.print("RX COMMAND OF TYPE ");
+    Serial.print(command_type);
+    Serial.print(" FROM ");
+    print_mac(mac_addr);
+    Serial.println();
+#endif
 
     if (command_type == COMMAND_SYNC_SETTINGS) {
       if (CONFIG.IS_MAIN_UNIT == false) {
@@ -136,14 +142,14 @@ void on_data_rx(const uint8_t *mac_addr, const uint8_t *incoming_data, int len) 
       }
     } else if (command_type == COMMAND_TRIGGER_NOISE_CAL) {
       if (CONFIG.IS_MAIN_UNIT == false) {
-        if (collecting_ambient_noise == false) {
-          collecting_ambient_noise = true;
+        if (noise_complete == true) {
+          noise_complete = false;
           start_noise_cal();
         }
       }
     } else if (command_type == COMMAND_CLEAR_NOISE_CAL) {
       if (CONFIG.IS_MAIN_UNIT == false) {
-        if (collecting_ambient_noise == false) {
+        if (noise_complete == true) {
           clear_noise_cal();
         }
       }

@@ -58,7 +58,7 @@ void load_config() {
 }
 
 void save_ambient_noise_calibration() {
-  Serial.print("SAVING AMBIENT_NOISE PROFILE...");
+  Serial.print("SAVING AMBIENT_NOISE PROFILE... ");
   File file = LittleFS.open("/noise_cal.bin", FILE_WRITE);
   if (!file) {
     Serial.println("Failed to open file for writing!");
@@ -68,8 +68,8 @@ void save_ambient_noise_calibration() {
   bytes_32 temp;
 
   file.seek(0);
-  for (uint16_t i = 0; i < 128; i++) {
-    float in_val = ambient_samples[i];
+  for (uint16_t i = 0; i < NUM_FREQS; i++) {
+    float in_val = noise_samples[i];
 
     temp.long_val_float = in_val;
 
@@ -84,7 +84,7 @@ void save_ambient_noise_calibration() {
 }
 
 void load_ambient_noise_calibration() {
-  Serial.print("LOADING AMBIENT_NOISE PROFILE...");
+  Serial.print("LOADING AMBIENT_NOISE PROFILE... ");
   File file = LittleFS.open("/noise_cal.bin", FILE_READ);
   if (!file) {
     Serial.println("Failed to open file for reading!");
@@ -94,15 +94,23 @@ void load_ambient_noise_calibration() {
   bytes_32 temp;
 
   file.seek(0);
-  for (uint16_t i = 0; i < 128; i++) {
+  for (uint16_t i = 0; i < NUM_FREQS; i++) {
     temp.bytes[0] = file.read();
     temp.bytes[1] = file.read();
     temp.bytes[2] = file.read();
     temp.bytes[3] = file.read();
 
-    ambient_samples[i] = temp.long_val_float;
+    noise_samples[i] = temp.long_val_float;
   }
 
   file.close();
   Serial.println("LOAD COMPLETE");
+}
+
+void init_fs(){
+  Serial.print("INIT FILESYSTEM: ");
+  Serial.println(LittleFS.begin(true) == true ? PASS : FAIL);
+
+  load_ambient_noise_calibration();
+  load_config();
 }

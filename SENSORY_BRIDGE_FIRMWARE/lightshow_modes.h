@@ -1,259 +1,254 @@
-/*----------------------------------------
-  Sensory Bridge LIGHTSHOW FUNCTIONS
-----------------------------------------*/
-
-void duet_mode() {
-  for (uint8_t i = 0; i < 128; i++) {
-    float fft_val = fft_processed[i];
-
-    if (fft_val < 0.0) {
-      fft_val = 0.0;
+// Default mode! 
+void light_mode_gdft() {
+  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) { // 64 freqs
+    float bin = note_spectrogram_smooth[i];
+    if (bin > 1.0) {
+      bin = 1.0;
     }
-    if (fft_val > 1.0) {
-      fft_val = 1.0;
-    }
+    uint8_t led_brightness = 255 * (bin * bin); // squared for gamma correction
+    brightness_levels[i] = led_brightness; // Can use this value later if needed
+    
+    float led_hue = 21.33333333 * i; // Makes hue completely cycle once per octave
 
-    uint16_t final_level = 255 * (fft_val * fft_val);
+    CRGB col = CRGB(0, 0, 0);
+    hsv2rgb_spectrum( // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
+      CHSV(led_hue, 255, led_brightness), 
+      col
+    );
 
-    if (final_level > 255) {
-      final_level = 255;
-    }
-
-    hsv2rgb_spectrum(
-      CHSV(
-        CONFIG.BASE_HUE + (hue_scatter[i]) - (fft_val * 32) - (64 * (i / 128.0)),
-        255,
-        final_level),
-      leds[i]);
+    leds[i * 2 + 0] = col; // Two LEDs at a time
+    leds[i * 2 + 1] = col;
   }
 }
 
-void bloom_mode(bool fast_mode) {
-  float fft_sum = 0.0;
-  for (uint8_t i = 0; i < 128; i++) {
-    fft_sum += fft_output_history[fft_output_history_index][i];
-  }
-  fft_sum /= 96.0;
 
-  if (fft_sum > 1.0) {
-    fft_sum = 1.0;
-  }
+// ----------------------------------------------------------------------------
+//
+// (Work in progress code below, may delete later)
+//
+// ----------------------------------------------------------------------------
 
-  fft_sum = fft_sum * fft_sum;
 
-  uint8_t base_index = 0;
-  if (fast_mode) {
-    base_index = 1;
+void light_mode_gdft_retro(uint32_t t_now_us) {
+  // SPECTROGRAM
+  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
+    retro_heat_targets[i] = note_spectrogram_smooth[i];
   }
 
-  for (int16_t i = 127; i > base_index; i--) {
-    leds_temp[i].r = leds_last[i - (1 + base_index)].r;
-    leds_temp[i].g = leds_last[i - (1 + base_index)].g;
-    leds_temp[i].b = leds_last[i - (1 + base_index)].b;
+  update_retro_heat(t_now_us);
+  render_retro_heat();
+
+  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
+    float hue = (21.33333333) * i;
+    CRGB filter = CHSV(hue, 215, 255);
+
+    filter.r *=  0.5;
+
+    float b_val = leds[i * 2 + 0].b / 255.0;
+    leds[i * 2 + 0].b = sqrtf(b_val) * 255;
+
+    leds[i * 2 + 0].r = (leds[i * 2 + 0].r * 0.05) + scale8(leds[i * 2 + 0].r, filter.r) * 0.95;
+    leds[i * 2 + 0].g = (leds[i * 2 + 0].g * 0.05) + scale8(leds[i * 2 + 0].g, filter.g) * 0.95;
+    leds[i * 2 + 0].b = (leds[i * 2 + 0].b * 0.05) + scale8(leds[i * 2 + 0].b, filter.b) * 0.95;
+
+    leds[i * 2 + 1] = leds[i * 2 + 0];
   }
-
-  hsv2rgb_spectrum(
-    CHSV(CONFIG.BASE_HUE - (30 * fft_sum), 255, 255 * fft_sum),
-    leds_temp[0]);
-
-  if (fast_mode) {
-    hsv2rgb_spectrum(
-      CHSV(CONFIG.BASE_HUE - (30 * fft_sum), 255, 255 * fft_sum),
-      leds_temp[1]);
-  }
-
-  load_leds_from_temp();
-  save_leds_to_last();
 }
 
-void waveform_mode() {
-  for (uint16_t i = 0; i < 128; i++) {
-    uint16_t index_a = i * 2;
-    uint16_t index_b = i * 2 + 1;
-
-    if (index_b >= BUFFER_SIZE) {
-      index_b = index_a;
-    }
-
-    int32_t sample_a = (i2s_samples[0][index_a] + i2s_samples[1][index_a] + i2s_samples[2][index_a] + i2s_samples[3][index_a]) >> 2;
-    int32_t sample_b = (i2s_samples[0][index_b] + i2s_samples[1][index_b] + i2s_samples[2][index_b] + i2s_samples[3][index_b]) >> 2;
-    int32_t sample = (sample_a + sample_b) >> 1;
-    sample -= CONFIG.DC_OFFSET;
-    sample *= 48;
-
-    if (sample < -32767) {
-      sample = -32767;
-    } else if (sample > 32767) {
-      sample = 32767;
-    }
-
-    sample += 16384;
-
-    if (sample < 0) {
-      sample = 0;
-    }
-
-    sample *= 2;
-
-    if (sample > 65535) {
-      sample = 65535;
-    }
-
-    float val = sample / 65536.0;
-
-    uint8_t out_val = val * val * 255;
-
+void light_mode_gdft_chromagram() {
+  // CHROMAGRAM
+  for (uint8_t i = 0; i < 128; i += 1) {
+    float chroma_level = interpolate(i / 128.0, note_chromagram, 12);
     hsv2rgb_spectrum(
-      CHSV(
-        CONFIG.BASE_HUE + (hue_scatter[i]) - (64 * (i / 128.0)),
-        255,
-        out_val),
-      leds[i]);
-
-    float smooth_low = 0.05;
-    float smooth_high = 0.3;
-
-    float smooth_factor = (CONFIG.MOOD) * (smooth_high - smooth_low) / (1.0) + smooth_low;
-
-    leds[i].r = (leds_last[i].r * (1.0 - smooth_factor)) + (leds[i].r * smooth_factor);
-    leds[i].g = (leds_last[i].g * (1.0 - smooth_factor)) + (leds[i].g * smooth_factor);
-    leds[i].b = (leds_last[i].b * (1.0 - smooth_factor)) + (leds[i].b * smooth_factor);
+      CHSV(21.33333333333333 * (i / 10.0), 255, 255 * chroma_level),
+      leds[i]
+    );
   }
-
-  save_leds_to_last();
 }
 
-void vu_mode(bool dot_mode) {
-  static int32_t max_val_cap = -10000000;
-  static int32_t min_val_cap = 10000000;
-  static int32_t short_term_delta_last = 1;
-
-  int32_t max_val = -10000000;
-  int32_t min_val = 10000000;
-  for (uint16_t i = 0; i < BUFFER_SIZE; i++) {
-    int32_t audio_sample = ((i2s_samples[0][i] + i2s_samples[1][i] + i2s_samples[2][i] + i2s_samples[3][i]) >> 2) - CONFIG.DC_OFFSET;
-    if (audio_sample < min_val_cap) {
-      min_val_cap = audio_sample;
+void light_mode_gdft_with_peak_color_spreading() {
+  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
+    float bin = note_spectrogram_smooth[i];
+    if (bin > 1.0) {
+      bin = 1.0;
     }
-    if (audio_sample > max_val_cap) {
-      max_val_cap = audio_sample;
+    float bright = 255 * (bin * bin);
+    brightness_levels[i] = bright;
+  }
+
+  enum peak_states {
+    UNSOLVED,
+    UNEXPANDED,
+    EXPANDED
+  };
+
+  static float hue_positions_follower[NUM_FREQS] = { 0 };
+
+  //Serial.println("IDENTIFY PEAKS -----------------------");
+
+  uint8_t peak_positions   [NUM_FREQS] = { UNSOLVED };
+  float   hue_positions    [NUM_FREQS] = { -1       };
+  bool    solved_map       [NUM_FREQS] = { false    };
+
+  bool debug_map[NUM_FREQS] = { false };
+
+  uint8_t peak_index = 0;
+
+  fadeToBlackBy( leds, 128, 255 );
+
+  bool in_peak = false;
+  uint8_t start_pos = 0;
+  uint8_t end_pos = 0;
+  bool    rising  = false;
+  bool    falling = false;
+
+  uint8_t last_val = 0;
+  uint8_t peaks_found = 0;
+  uint8_t peak_start = 0;
+  uint8_t peak_end   = 0;
+  bool peak_complete = false;
+
+  for (uint8_t i = 0; i < NUM_FREQS; i++) {
+    if (brightness_levels[i] == 0) { // if blank, consider solved
+      if (falling == true) {
+        falling = false;
+        peak_end = i;
+        peak_complete = true;
+      }
+      else {
+        peak_start = i;
+      }
+    }
+    else { // if not blank (peak area)
+      if (brightness_levels[i] > last_val) { // brightness rising
+        if (rising == false) {
+          if (falling == true) { // didn't fall to full zero, but this is the end of a peak
+            falling = false;
+            peak_end = i;
+            peak_complete = true;
+          }
+          else {
+            rising = true;
+            peak_start = i;
+          }
+        }
+      }
+      else if (brightness_levels[i] < last_val) { // brightness falling
+        if (rising == true) {
+          rising = false;
+          falling = true;
+        }
+      }
+      else {
+        // stayed the same since last pixel, above zero
+      }
     }
 
-    if (audio_sample < min_val) {
-      min_val = audio_sample;
+    if (peak_complete == true) {
+      peak_complete = false;
+      uint8_t peak_center = (peak_start + peak_end) / 2.0;
+
+      hue_positions[peak_center] = 21.33333333 * peak_center; // hit peak here, set color
+      while (hue_positions[peak_center] >= 256.0) {
+        hue_positions[peak_center] -= 256.0;
+      }
+      if (hue_positions[peak_center] > 255.0) {
+        hue_positions[peak_center] = 255.0;
+      }
+      peak_positions[peak_center] = UNEXPANDED;
+      debug_map[peak_center]  = true;
+      peaks_found++;
+      //Serial.print("PEAK FOUND AT ");
+      //Serial.println(peak_center);
     }
-    if (audio_sample > max_val) {
-      max_val = audio_sample;
-    }
+
+    last_val = brightness_levels[i];
   }
 
-  if (max_val_cap < 700) {
-    max_val_cap = 700;
-  }
-  if (min_val_cap > -700) {
-    min_val_cap = -700;
-  }
+  if (peaks_found > 0) {
+    //Serial.println("SOLVE EXPANSION -----------------------");
+    bool solved = false;
+    uint8_t pointer_index = 0;
+    while (solved == false) {
+      int16_t this_index  = pointer_index;
+      if (peak_positions[this_index] == UNEXPANDED) { // if this pixel is an unexpanded peak
+        float expand_hue = hue_positions[this_index];
 
-  int32_t short_term_delta = abs(max_val - min_val);
-  int32_t long_term_delta = abs(max_val_cap - min_val_cap);
+        uint16_t expansion_size = 1;
+        bool peak_solved = false;
+        while (peak_solved == false) {
+          int16_t left_index  = pointer_index - expansion_size;
+          int16_t right_index = pointer_index + expansion_size;
 
-  max_val_cap *= 0.99;
-  min_val_cap *= 0.99;
+          if (left_index >= 0) {
+            if (peak_positions[left_index ] != UNSOLVED) {
+              peak_solved = true;
+            }
+            if (peak_positions[right_index] != UNSOLVED) {
+              peak_solved = true;
+            }
+          }
 
-  float smooth_factor = 0.05 + (CONFIG.MOOD * 0.45);
-  short_term_delta = (short_term_delta * (smooth_factor)) + (short_term_delta_last * (1.0 - smooth_factor));
-  short_term_delta_last = short_term_delta;
+          if (peak_solved == false) {
+            expansion_size += 1;
+          }
+        }
 
-  float audio_level = short_term_delta / float(long_term_delta);
-  if (audio_level > 1.0) {
-    audio_level = 1.0;
-  }
+        uint16_t half_expansion = expansion_size / 2;
 
-  audio_level *= 126.0;
+        int16_t left_index  = pointer_index - half_expansion;
+        int16_t right_index = pointer_index + half_expansion;
 
-  float audio_level_out = 0.0;
-  memcpy(&audio_level_out, &audio_level, sizeof(float));
+        if (left_index < 0) {
+          left_index = 0;
+        }
+        if (right_index >= NUM_FREQS) {
+          right_index = NUM_FREQS - 1;
+        }
 
-  int audio_level_floored = floor(audio_level_out);
-  if (audio_level_floored < 0) {
-    audio_level_floored = 0;
-  } else if (audio_level_floored > 127) {
-    audio_level_floored = 127;
-  }
+        for (uint8_t e = left_index; e <= right_index; e++) {
+          hue_positions[e] = expand_hue;
+        }
 
-  float audio_level_lerp = audio_level_out - audio_level_floored;
-
-  for (uint8_t i = 0; i < 128; i++) {
-    leds[i].r = 0;//leds[i].r * 0.5;
-    leds[i].g = 0;//leds[i].g * 0.5;
-    leds[i].b = 0;//leds[i].b * 0.5;
-  }
-
-  if (dot_mode == false) {  // Standard display
-    for (uint8_t i = 0; i < 128; i++) {
-      float output_level;
-
-      if (i <= audio_level_floored) {
-        output_level = 1.0;
-      } else if (i == audio_level_floored + 1) {
-        output_level = audio_level_lerp;
-      } else {
-        output_level = 0.0;
+        peak_positions[this_index] = EXPANDED; // peak solved and expanded
       }
 
-      hsv2rgb_spectrum(
-        CHSV(
-          CONFIG.BASE_HUE + (hue_scatter[i]) - (64 * (i / 128.0)),
-          255,
-          255 * output_level),
-        leds[i]);
+      pointer_index++;
+      if (pointer_index >= NUM_FREQS) {
+        pointer_index = 0;
+      }
+
+      solved = true; // temporary
+      for (uint8_t i = 0; i < NUM_FREQS; i++) { // check for holes in expansion
+        if (peak_positions[i] == UNEXPANDED) { // if hole, not solved yet
+          solved = false;
+        }
+      }
     }
-  } else if (dot_mode == true) {  // Dot mode
-    float dot_pos = audio_level_floored;
-    float dot_lerp = audio_level_lerp;
-    static float dot_pos_last = 0;
+  }
 
-    float dot_delta = fabs(dot_pos - dot_pos_last);
-    float output_level = 8.0;
-    output_level /= dot_delta;
-    if (output_level > 1.0) {
-      output_level = 1.0;
+  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
+    if (hue_positions[i] > hue_positions_follower[i]) {
+      float delta = hue_positions[i] - hue_positions_follower[i];
+      hue_positions_follower[i] += delta * 0.1;
     }
-
-    int16_t wipe_start = dot_pos_last - 1;
-    int16_t wipe_end = dot_pos + 1;
-    if (dot_pos < dot_pos_last) {
-      wipe_start = dot_pos - 1;
-      wipe_end = dot_pos_last + 1;
+    if (hue_positions[i] < hue_positions_follower[i]) {
+      float delta = hue_positions_follower[i] - hue_positions[i];
+      hue_positions_follower[i] -= delta * 0.1;
     }
+  }
 
-    if (wipe_start < 1) {
-      wipe_start = 1;
-    }
-    if (wipe_end > 126) {
-      wipe_end = 126;
-    }
+  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
+    float   led_hue = 21.33333333 * i; //hue_positions_follower[i];
+    uint8_t led_brightness = brightness_levels[i];
 
-    for (int16_t i = wipe_start; i < wipe_end; i++) {
-      leds[i] += CHSV(
-        CONFIG.BASE_HUE + (hue_scatter[i]) - (64 * (i / 128.0)),
-        255,
-        255 * (output_level * output_level));
-    }
+    CRGB col = CRGB(0, 0, 0);
+    hsv2rgb_spectrum(
+      CHSV(led_hue, 255, led_brightness),
+      col
+    );
 
-    float lerp_level;
-    lerp_level = (1.0 - dot_lerp) * output_level;
-    leds[wipe_start - 1] += CHSV(
-      CONFIG.BASE_HUE + (hue_scatter[wipe_start - 1]) - (64 * ((wipe_start - 1) / 128.0)),
-      255,
-      255 * (lerp_level * lerp_level));
-
-    lerp_level = dot_lerp * output_level;
-    leds[wipe_end] += CHSV(
-      CONFIG.BASE_HUE + (hue_scatter[wipe_end]) - (64 * ((wipe_end) / 128.0)),
-      255,
-      255 * (lerp_level * lerp_level));
-
-    dot_pos_last = dot_pos;
+    leds[i * 2 + 0] = col;
+    leds[i * 2 + 1] = col;
   }
 }
