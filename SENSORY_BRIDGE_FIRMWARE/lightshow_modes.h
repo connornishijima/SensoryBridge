@@ -1,25 +1,79 @@
-// Default mode! 
+// Default mode!
 void light_mode_gdft() {
-  for (uint8_t i = 0; i < NUM_FREQS; i += 1) { // 64 freqs
+  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {  // 64 freqs
     float bin = note_spectrogram_smooth[i];
-    for(uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++){
+    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
       bin = bin * bin;
     }
     uint16_t led_brightness = 255 * bin;
-    
-    brightness_levels[i] = led_brightness; // Can use this value later if needed
-    
-    float led_hue = 21.33333333 * i; // Makes hue completely cycle once per octave
+
+    brightness_levels[i] = led_brightness;  // Can use this value later if needed
+
+    float led_hue = 21.33333333 * i;  // Makes hue completely cycle once per octave
 
     CRGB col = CRGB(0, 0, 0);
-    hsv2rgb_spectrum( // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
-      CHSV(led_hue, 255, brightness_levels[i]), 
-      col
-    );
+    hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
+      CHSV(led_hue, 255, brightness_levels[i]),
+      col);
 
-    leds[i * 2 + 0] = col; // Two LEDs at a time
+    leds[i * 2 + 0] = col;  // Two LEDs at a time
     leds[i * 2 + 1] = col;
   }
+}
+
+void light_mode_gdft_chromagram() {
+  for (uint16_t i = 0; i < 128; i++) {
+    float prog = i / 128.0;
+    float level = interpolate(prog, note_chromagram, 12);
+
+    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
+      level = level * level;
+    }
+
+    leds[i] = CHSV(255 * prog, 255, 255 * level);
+  }
+}
+
+void light_mode_bloom(bool fast_scroll) {
+  static uint32_t iter = 0;
+  const float led_share = 255 / float(12);
+
+  iter++;
+
+  CRGB sum_color = CRGB(0, 0, 0);
+  for (uint8_t i = 0; i < 12; i++) {
+    float prog = i / float(12);
+    float bin = note_chromagram[i];
+
+    //bin *= 2.0;
+
+    if (bin > 1.0) {
+      bin = 1.0;
+    }
+
+    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER+2; s++) {
+      bin = bin * bin;
+    }
+
+    CRGB out_col;
+    hsv2rgb_spectrum(
+      CHSV(255 * prog, 255, led_share * bin),
+      out_col);
+    sum_color += out_col;
+  }
+
+  if (iter % 2 == 1 || fast_scroll == true) { // Render every other frame in slow mode, or all in fast mode
+    for (uint8_t i = 0; i < 127; i++) {
+      leds_temp[127 - i] = leds_last[127 - i - 1];
+    }
+  }
+  else{ // Skip frame in slow mode
+    memcpy(leds_temp, leds_last, sizeof(CRGB)*128);
+  }
+  leds_temp[0] = sum_color; // New information goes here
+
+  load_leds_from_temp();
+  save_leds_to_last();
 }
 
 

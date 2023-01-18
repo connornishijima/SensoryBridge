@@ -32,7 +32,7 @@ void stop_streams() {
 }
 
 void init_serial(uint32_t baud_rate) {
-  Serial.begin(baud_rate); // Default 500,000 baud
+  Serial.begin(baud_rate);  // Default 500,000 baud
   bool timeout = false;
   bool serial_started = true;
   uint32_t t_start = millis();
@@ -49,7 +49,7 @@ void init_serial(uint32_t baud_rate) {
 
   // Print welcome message
   Serial.println("---------------------------");
-  Serial.print  ("SENSORY BRIDGE | VER: ");
+  Serial.print("SENSORY BRIDGE | VER: ");
   Serial.println(FIRMWARE_VERSION);
   Serial.println("---------------------------");
   Serial.println();
@@ -135,6 +135,9 @@ void dump_info() {
   Serial.print("CONFIG.GAIN: ");
   Serial.println(CONFIG.GAIN);
 
+  Serial.print("CONFIG.BOOT_ANIMATION: ");
+  Serial.println(CONFIG.BOOT_ANIMATION);
+
   Serial.print("CONFIG.DC_OFFSET: ");
   Serial.println(CONFIG.DC_OFFSET);
 
@@ -150,8 +153,8 @@ void dump_info() {
   Serial.print("CONFIG.VERSION: ");
   Serial.println(CONFIG.VERSION);
 
-  Serial.print("MASTER_BRIGHTHNESS: ");
-  Serial.println(MASTER_BRIGHTHNESS);
+  Serial.print("MASTER_BRIGHTNESS: ");
+  Serial.println(MASTER_BRIGHTNESS);
 
   Serial.print("stream_audio: ");
   Serial.println(stream_audio);
@@ -234,7 +237,7 @@ void parse_command(char* command_buf) {
     Serial.println("                                       Options are: audio, fps, max_mags, max_mags_followers, magnitudes, spectrogram");
     Serial.println("     led_type=['neopixel'/'dotstar'] | Sets which LED protocol to use, 3 wire or 4 wire");
     Serial.println("        led_count=[int or 'default'] | Sets how many LEDs your display will use (native resolution is 128)");
-    Serial.println("                        debug=[bool] | Enables debug mode, where functions are timed");
+    Serial.println("                  debug=[true/false] | Enables debug mode, where functions are timed");
     Serial.println("       sample_rate=[hz or 'default'] | Sets the microphone sample rate");
     Serial.println("     note_offset=[0-32 or 'default'] | Sets the lowest note, as a positive offset from A1 (55.0Hz)");
     Serial.println("      square_iter=[int or 'default'] | Sets the number of times the LED output is squared (contrast)");
@@ -242,7 +245,8 @@ void parse_command(char* command_buf) {
     Serial.println("   max_block_size=[int or 'default'] | Sets the maximum number of samples used to compute frequency data");
     Serial.println("samples_per_chunk=[int or 'default'] | Sets the number of samples collected every frame");
     Serial.println("           gain=[float or 'default'] | Sets the scaling of spectrogram data (>0.0 is brighter, <0.0 is darker)");
-    Serial.println("                set_main_unit=[bool] | Sets if this unit is MAIN or not for SensorySync");
+    Serial.println(" boot_animation=[true/false/default] | Enable or disable the boot animation");
+    Serial.println("          set_main_unit=[true/false] | Sets if this unit is MAIN or not for SensorySync");
 
   }
 
@@ -286,7 +290,7 @@ void parse_command(char* command_buf) {
   else if (strcmp(command_buf, "stop") == 0) {
 
     stop_streams();
-    
+
   }
 
   // Print the average FPS ----------------------------------
@@ -297,7 +301,7 @@ void parse_command(char* command_buf) {
 
   // COMMANDS WITH METADATA ##################################
 
-  else { // Commands with metadata are parsed here
+  else {  // Commands with metadata are parsed here
 
     // PARSER #############################
     // Parse command type
@@ -329,8 +333,7 @@ void parse_command(char* command_buf) {
     if (strcmp(command_type, "set_main_unit") == 0) {
       if (strcmp(command_data, "true") == 0) {
         CONFIG.IS_MAIN_UNIT = true;
-      }
-      else if (strcmp(command_data, "false") == 0) {
+      } else if (strcmp(command_data, "false") == 0) {
         CONFIG.IS_MAIN_UNIT = false;
       }
       save_config();
@@ -346,13 +349,11 @@ void parse_command(char* command_buf) {
         debug_mode = true;
         Serial.println("DEBUG MODE ENABLED, CPU BENCHMARKING ACTIVE");
         cpu_usage.attach_ms(5, check_current_function);
-      }
-      else if (strcmp(command_data, "false") == 0) {
+      } else if (strcmp(command_data, "false") == 0) {
         debug_mode = false;
         Serial.println("DEBUG MODE DISABLED");
         cpu_usage.detach();
-      }
-      else {
+      } else {
         bad_command(command_type, command_data);
       }
     }
@@ -361,8 +362,7 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "sample_rate") == 0) {
       if (strcmp(command_data, "default") == 0) {
         CONFIG.SAMPLE_RATE = CONFIG_DEFAULTS.SAMPLE_RATE;
-      }
-      else {
+      } else {
         CONFIG.SAMPLE_RATE = atol(command_data);
       }
       save_config();
@@ -375,8 +375,7 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "note_offset") == 0) {
       if (strcmp(command_data, "default") == 0) {
         CONFIG.NOTE_OFFSET = CONFIG_DEFAULTS.NOTE_OFFSET;
-      }
-      else {
+      } else {
         CONFIG.NOTE_OFFSET = atol(command_data);
       }
       save_config();
@@ -389,8 +388,7 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "square_iter") == 0) {
       if (strcmp(command_data, "default") == 0) {
         CONFIG.SQUARE_ITER = CONFIG_DEFAULTS.SQUARE_ITER;
-      }
-      else {
+      } else {
         CONFIG.SQUARE_ITER = atol(command_data);
       }
       save_config();
@@ -402,8 +400,7 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "magnitude_floor") == 0) {
       if (strcmp(command_data, "default") == 0) {
         CONFIG.MAGNITUDE_FLOOR = CONFIG_DEFAULTS.MAGNITUDE_FLOOR;
-      }
-      else {
+      } else {
         CONFIG.MAGNITUDE_FLOOR = atol(command_data);
       }
       save_config();
@@ -415,11 +412,9 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "led_type") == 0) {
       if (strcmp(command_data, "neopixel") == 0) {
         CONFIG.LED_TYPE = LED_NEOPIXEL;
-      }
-      else if (strcmp(command_data, "dotstar") == 0) {
+      } else if (strcmp(command_data, "dotstar") == 0) {
         CONFIG.LED_TYPE = LED_DOTSTAR;
-      }
-      else {
+      } else {
         bad_command(command_type, command_data);
       }
       save_config();
@@ -432,8 +427,7 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "led_count") == 0) {
       if (strcmp(command_data, "default") == 0) {
         CONFIG.LED_COUNT = CONFIG_DEFAULTS.LED_COUNT;
-      }
-      else {
+      } else {
         CONFIG.LED_COUNT = atol(command_data);
       }
       save_config();
@@ -446,8 +440,7 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "max_block_size") == 0) {
       if (strcmp(command_data, "default") == 0) {
         CONFIG.MAX_BLOCK_SIZE = CONFIG_DEFAULTS.MAX_BLOCK_SIZE;
-      }
-      else {
+      } else {
         CONFIG.MAX_BLOCK_SIZE = atol(command_data);
       }
       save_config();
@@ -460,8 +453,7 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "samples_per_chunk") == 0) {
       if (strcmp(command_data, "default") == 0) {
         CONFIG.SAMPLES_PER_CHUNK = CONFIG_DEFAULTS.SAMPLES_PER_CHUNK;
-      }
-      else {
+      } else {
         CONFIG.SAMPLES_PER_CHUNK = atol(command_data);
       }
       save_config();
@@ -474,8 +466,7 @@ void parse_command(char* command_buf) {
     else if (strcmp(command_type, "gain") == 0) {
       if (strcmp(command_data, "default") == 0) {
         CONFIG.GAIN = CONFIG_DEFAULTS.GAIN;
-      }
-      else {
+      } else {
         CONFIG.GAIN = atof(command_data);
       }
       save_config();
@@ -483,28 +474,39 @@ void parse_command(char* command_buf) {
       Serial.println(CONFIG.GAIN);
     }
 
+    // Toggle Boot Animation --------------------------
+    else if (strcmp(command_type, "boot_animation") == 0) {
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.BOOT_ANIMATION = CONFIG_DEFAULTS.BOOT_ANIMATION;
+      }
+      else if (strcmp(command_data, "true") == 0) {
+        CONFIG.BOOT_ANIMATION = true;
+      } else if (strcmp(command_data, "false") == 0) {
+        CONFIG.BOOT_ANIMATION = false;
+      } else {
+        bad_command(command_type, command_data);
+      }
+      save_config();
+      Serial.print("BOOT_ANIMATION: ");
+      Serial.println(CONFIG.BOOT_ANIMATION);
+    }
+
     // Stream a given value over Serial -----------------
     else if (strcmp(command_type, "stream") == 0) {
-      stop_streams(); // Stop any current streams
+      stop_streams();  // Stop any current streams
       if (strcmp(command_data, "audio") == 0) {
         stream_audio = true;
-      }
-      else if (strcmp(command_data, "fps") == 0) {
+      } else if (strcmp(command_data, "fps") == 0) {
         stream_fps = true;
-      }
-      else if (strcmp(command_data, "max_mags") == 0) {
+      } else if (strcmp(command_data, "max_mags") == 0) {
         stream_max_mags = true;
-      }
-      else if (strcmp(command_data, "max_mags_followers") == 0) {
+      } else if (strcmp(command_data, "max_mags_followers") == 0) {
         stream_max_mags_followers = true;
-      }
-      else if (strcmp(command_data, "magnitudes") == 0) {
+      } else if (strcmp(command_data, "magnitudes") == 0) {
         stream_magnitudes = true;
-      }
-      else if (strcmp(command_data, "spectrogram") == 0) {
+      } else if (strcmp(command_data, "spectrogram") == 0) {
         stream_spectrogram = true;
-      }
-      else {
+      } else {
         bad_command(command_type, command_data);
       }
     }
@@ -523,7 +525,7 @@ void check_serial(uint32_t t_now) {
   serial_iter++;
   if (Serial.available() > 0) {
     char c = Serial.read();
-    if (c != '\n') { // If normal character, add to buffer
+    if (c != '\n') {  // If normal character, add to buffer
       command_buf[command_buf_index] = c;
       command_buf_index++;
 
@@ -532,11 +534,11 @@ void check_serial(uint32_t t_now) {
         command_buf_index = 127;
       }
 
-    } else { // If a newline character is received,
+    } else {  // If a newline character is received,
       // the command in the buffer should be parsed
-      parse_command(command_buf); // Parse
-      memset(&command_buf, 0, sizeof(char) * 128); // Clear
-      command_buf_index = 0; // Reset
+      parse_command(command_buf);                   // Parse
+      memset(&command_buf, 0, sizeof(char) * 128);  // Clear
+      command_buf_index = 0;                        // Reset
     }
   }
 }

@@ -20,6 +20,7 @@ struct conf {
   uint16_t MAX_BLOCK_SIZE;
   uint16_t SAMPLES_PER_CHUNK;
   float    GAIN;
+  bool     BOOT_ANIMATION;
   int32_t  DC_OFFSET; // (TODO)
   uint32_t WAVEFORM_NOISE_FLOOR; // (TODO)
   uint8_t  ESPNOW_CHANNEL; // (TODO)
@@ -47,6 +48,7 @@ conf CONFIG = { // Defaults of the CONFIG struct
   1600,                // MAX_BLOCK_SIZE
   256,                 // SAMPLES_PER_CHUNK
   0.0,                 // GAIN
+  true,                // BOOT_ANIMATION
   0,                   // DC_OFFSET
   0,                   // WAVEFORM_NOISE_FLOOR
   3,                   // ESPNOW_CHANNEL
@@ -216,7 +218,7 @@ uint8_t brightness_levels[NUM_FREQS] = { 0 };
 
 // WIP BELOW --------------------------------------------------
 
-float MASTER_BRIGHTHNESS = 0.0;
+float MASTER_BRIGHTNESS = 0.0;
 float last_sample = 0;
 
 float retro_bulbs[NUM_FREQS]        = {0};

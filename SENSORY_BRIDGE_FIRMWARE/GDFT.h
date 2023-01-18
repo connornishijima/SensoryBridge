@@ -61,13 +61,13 @@ void IRAM_ATTR process_GDFT() {
 
   // Reset magnitude caps every frame
   for (uint8_t i = 0; i < NUM_ZONES; i++) {
-    max_mags[i] = CONFIG.MAGNITUDE_FLOOR; // Higher than the average noise floor
+    max_mags[i] = CONFIG.MAGNITUDE_FLOOR;  // Higher than the average noise floor
   }
 
   // Increment spectrogram history index
   spectrogram_history_index++;
   if (spectrogram_history_index >= spectrogram_history_length) {
-    spectrogram_history_index = 0; // wrap to index zero at end
+    spectrogram_history_index = 0;  // wrap to index zero at end
   }
 
   // Run GDFT (Goertzel-based Discrete Fourier Transform) with 64 frequencies
@@ -93,13 +93,13 @@ void IRAM_ATTR process_GDFT() {
 
     magnitudes[i] *= float(frequencies[i].block_size_recip);
 
-    if(magnitudes[i] < 0.0){
+    if (magnitudes[i] < 0.0) {
       magnitudes[i] = 0.0;
     }
   }
 
   if (stream_magnitudes == true) {
-    if (serial_iter >= 2) { // Don't print every frame
+    if (serial_iter >= 2) {  // Don't print every frame
       serial_iter = 0;
       for (uint16_t i = 0; i < NUM_FREQS; i++) {
         Serial.print(uint32_t(magnitudes[i]));
@@ -136,8 +136,8 @@ void IRAM_ATTR process_GDFT() {
     }
 
     mag_targets[i] = magnitudes[i];
-    if (mag_targets[i]*(1.0-CONFIG.GAIN) > max_mags[frequencies[i].zone]) {
-      max_mags[frequencies[i].zone] = mag_targets[i]*(1.0-CONFIG.GAIN);
+    if (mag_targets[i] * (1.0 - CONFIG.GAIN) > max_mags[frequencies[i].zone]) {
+      max_mags[frequencies[i].zone] = mag_targets[i] * (1.0 - CONFIG.GAIN);
     }
   }
 
@@ -262,14 +262,16 @@ void IRAM_ATTR process_GDFT() {
     mag_float = mag_float * (1.0 - smoothing_exp_average) + mag_float_last[i] * smoothing_exp_average;
     mag_float_last[i] = mag_float;
 
-    note_spectrogram[i] = mag_float; // This array is the current value
-    spectrogram_history[spectrogram_history_index][i] = note_spectrogram[i]; // This array is the value's history
+    note_spectrogram[i] = mag_float;                                          // This array is the current value
+    spectrogram_history[spectrogram_history_index][i] = note_spectrogram[i];  // This array is the value's history
   }
 
-  /*
-    // Make Chromagram
-    float note_chromagram[12] = {0};
-    for (uint8_t note = 0; note < 12; note++) {
+
+  // Make Chromagram
+  for (uint8_t i = 0; i < 12; i++) {
+    note_chromagram[i] = 0;
+  }
+  for (uint8_t note = 0; note < 12; note++) {
     for (uint8_t octave = 0; octave < 6; octave++) {
       uint16_t note_index = 12 * octave + note;
       if (note_index < NUM_FREQS) {
@@ -278,8 +280,7 @@ void IRAM_ATTR process_GDFT() {
         }
       }
     }
-    }
-  */
+  }
 }
 
 void lookahead_smoothing() {
@@ -336,10 +337,10 @@ void lookahead_smoothing() {
   }
 
   if (stream_spectrogram == true) {
-    if (serial_iter >= 2) { // Don't print every frame
+    if (serial_iter >= 2) {  // Don't print every frame
       serial_iter = 0;
       for (uint16_t i = 0; i < NUM_FREQS; i++) {
-        uint16_t bin = 999*note_spectrogram_smooth[i];
+        uint16_t bin = 999 * note_spectrogram_smooth[i];
         Serial.print(bin);
         if (i < NUM_FREQS - 1) {
           Serial.print(',');
@@ -376,8 +377,7 @@ void detect_key() {
 
       if (scale_scores[k] > 60.0) {
         scale_scores[k] = 60.0;
-      }
-      else if (scale_scores[k] < 0.0) {
+      } else if (scale_scores[k] < 0.0) {
         scale_scores[k] = 0.0;
       }
     }
@@ -412,10 +412,7 @@ void get_average_value() {
   sum /= float(NUM_FREQS);
 
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-    note_spectrogram_smooth[i] = (
-                                   (note_spectrogram_smooth[i] * note_spectrogram_smooth[i]) * 0.5 +
-                                   note_spectrogram_smooth[i] * 0.5
-                                 );
+    note_spectrogram_smooth[i] = ((note_spectrogram_smooth[i] * note_spectrogram_smooth[i]) * 0.5 + note_spectrogram_smooth[i] * 0.5);
 
     note_spectrogram_smooth[i] *= 2.0;
     if (note_spectrogram_smooth[i] > 1.0) {

@@ -130,25 +130,20 @@ void init_system() {
   memcpy(&CONFIG_DEFAULTS, &CONFIG, sizeof(CONFIG)); // Copy defaults values to second CONFIG object
 
   init_serial(SERIAL_BAUD);
-  delay(50);  
   init_sweet_spot();
-  delay(50);
   init_fs();
-  delay(50);
   init_leds();
-  delay(50);
   init_i2s();
-  delay(50);
   init_p2p();
-  delay(50);  
   generate_a_weights();
-  delay(50);
   generate_window_lookup();
-  delay(50);
   generate_frequency_data();
-  delay(50);
 
   Serial.println("SYSTEM INIT COMPLETE!");
+
+  if(CONFIG.BOOT_ANIMATION == true){
+    intro_animation();
+  }
 }
 
 void log_fps(uint32_t t_now_us) {

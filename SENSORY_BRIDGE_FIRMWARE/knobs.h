@@ -86,11 +86,11 @@ void check_knobs(uint32_t t_now) {
 
   // This is only used to fade in when booting!
   if(t_now >= 1000){
-    if(MASTER_BRIGHTHNESS < 1.0){
-      MASTER_BRIGHTHNESS += 0.01;
+    if(MASTER_BRIGHTNESS < 1.0){
+      MASTER_BRIGHTNESS += 0.01;
     }
-    if(MASTER_BRIGHTHNESS > 1.0){
-      MASTER_BRIGHTHNESS = 1.00;
+    if(MASTER_BRIGHTNESS > 1.0){
+      MASTER_BRIGHTNESS = 1.00;
     }
   }
 
@@ -118,5 +118,5 @@ void check_knobs(uint32_t t_now) {
   smoothing_exp_average = 1.0 - smoothing_bottom_half; // invert input
 
   // PHOTONS knob is squared and applied here:
-  FastLED.setBrightness((255 * MASTER_BRIGHTHNESS) * (CONFIG.PHOTONS * CONFIG.PHOTONS));
+  FastLED.setBrightness((255 * MASTER_BRIGHTNESS) * (CONFIG.PHOTONS * CONFIG.PHOTONS));
 }
