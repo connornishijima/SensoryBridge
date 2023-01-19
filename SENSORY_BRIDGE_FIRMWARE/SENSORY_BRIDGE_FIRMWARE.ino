@@ -132,19 +132,23 @@ void loop() {
   // Capture a frame of I2S audio (holy crap, FINALLY something about sound)
 
   function_id = 6;
+  run_sweet_spot(); // (led_utilities.h)
+  // Based on the current audio volume, alter the Sweet Spot indicator LEDs
+
+  function_id = 7;
   process_GDFT();  // (GDFT.h)
   // Execute GDFT and post-process
   // (If you're wondering about that weird acronym, check out the source file)
 
-  function_id = 7;
+  function_id = 8;
   lookahead_smoothing();  // (GDFT.h)
   // Peek at upcoming frames to study/prevent flickeringd
 
-  function_id = 8;
+  function_id = 9;
   render_leds(t_now_us);  // (BELOW in this file)
   // Convert the data we found into a beautiful show
 
-  function_id = 9;
+  function_id = 10;
   log_fps(t_now_us);  // (system.h)
   // Log the current FPS
 
@@ -161,6 +165,10 @@ void loop() {
 // different rendering function from lightshow_modes.h:
 void render_leds(uint32_t t_now_us) {
   if (noise_complete == true) {  // If we're not gathering ambient noise data
+    if (mode_transition_queued == true || noise_transition_queued == true) {
+      run_transition_fade(); // (led_utilities.h) Fade to black between modes
+    }
+
     if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT) {
       light_mode_gdft();  // (lightshow_modes.h) GDFT spectrogram display
     } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {

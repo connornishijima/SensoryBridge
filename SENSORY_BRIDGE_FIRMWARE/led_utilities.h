@@ -1,3 +1,6 @@
+extern void propagate_noise_cal();
+extern void start_noise_cal();
+
 // Returns the linear interpolation of a floating point index in a CRGB array
 // index is in the range of 0.0-1.0
 CRGB lerp_led(float index, CRGB* led_array) {
@@ -27,6 +30,8 @@ void show_leds() {
       leds_out[i] = lerp_led(progress, leds);
     }
   }
+  // PHOTONS knob is squared and applied here:
+  FastLED.setBrightness((255 * MASTER_BRIGHTNESS) * (CONFIG.PHOTONS * CONFIG.PHOTONS));
   FastLED.show();
 }
 
@@ -140,7 +145,7 @@ void mirror_image_downwards() {
 }
 
 void intro_animation() {
-  FastLED.setBrightness(0);
+  MASTER_BRIGHTNESS = 1.0;
   ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   0.0 * 4096);
   ledcWrite(SWEET_SPOT_CENTER_CHANNEL, 0.0 * 4096);
   ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  0.0 * 4096);
@@ -151,7 +156,7 @@ void intro_animation() {
 
     brightness *= brightness;
 
-    FastLED.setBrightness(255 * brightness);
+    MASTER_BRIGHTNESS = brightness;
     ledcWrite(SWEET_SPOT_LEFT_CHANNEL,  brightness * 4096);
     ledcWrite(SWEET_SPOT_RIGHT_CHANNEL, brightness * 4096);
 
@@ -186,13 +191,13 @@ void intro_animation() {
     particles[i].speed = 0.002 * (i + 1);
     particles[i].col = CHSV(255 * prog, 255, 255);
   }
-  FastLED.setBrightness(255);
+  MASTER_BRIGHTNESS = 1.0;
   float center_brightness = 0.0;
 
   for (uint16_t i = 0; i < 50; i++) {
-    if(center_brightness < 1.0){
+    if (center_brightness < 1.0) {
       center_brightness += 0.2;
-      ledcWrite(SWEET_SPOT_CENTER_CHANNEL, (center_brightness*center_brightness) * 4096);
+      ledcWrite(SWEET_SPOT_CENTER_CHANNEL, (center_brightness * center_brightness) * 4096);
     }
 
     float dimming = 1.0;
@@ -201,13 +206,13 @@ void intro_animation() {
       anim_prog = (anim_prog - 0.5) * 2.0;
       dimming = 1.0 - anim_prog;
       dimming *= dimming;
-      FastLED.setBrightness(255 * dimming);
+      MASTER_BRIGHTNESS = dimming;
       ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   0);
       ledcWrite(SWEET_SPOT_CENTER_CHANNEL, dimming * 4096);
       ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  0);
     }
-    else{
-      anim_prog*=2.0;
+    else {
+      anim_prog *= 2.0;
       dimming = 1.0 - anim_prog;
       dimming *= dimming;
       ledcWrite(SWEET_SPOT_LEFT_CHANNEL,  dimming * 4096);
@@ -242,6 +247,107 @@ void intro_animation() {
   ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  0);
 }
 
+void run_sweet_spot() {
+  static float sweet_spot_brightness = 0.0; // init to zero for first fade in
+
+  if (sweet_spot_brightness < 1.0) {
+    sweet_spot_brightness += 0.05;
+  }
+
+  if (sweet_spot_state > sweet_spot_state_follower) {
+    float delta = sweet_spot_state - sweet_spot_state_follower;
+    sweet_spot_state_follower += delta * 0.05;
+  }
+  else if (sweet_spot_state < sweet_spot_state_follower) {
+    float delta = sweet_spot_state_follower - sweet_spot_state;
+    sweet_spot_state_follower -= delta * 0.05;
+  }
+
+  uint16_t led_power[3] = {0, 0, 0};
+
+  for (float i = -1; i <= 1; i++) {
+    float position_delta = fabs(i - sweet_spot_state_follower);
+    if (position_delta > 1.0) {
+      position_delta = 1.0;
+    }
+
+    float led_level = 1.0 - position_delta;
+    led_level *= led_level;
+
+    led_power[uint8_t(i + 1)] = 4095 * led_level * sweet_spot_brightness * CONFIG.PHOTONS;
+  }
+
+  ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   led_power[0]);
+  ledcWrite(SWEET_SPOT_CENTER_CHANNEL, led_power[1]);
+  ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  led_power[2]);
+}
+
+void run_transition_fade() {
+  if (MASTER_BRIGHTNESS > 0.0) {
+    MASTER_BRIGHTNESS -= 0.05;
+
+    if (MASTER_BRIGHTNESS < 0.0) {
+      MASTER_BRIGHTNESS = 0.0;
+    }
+  }
+  else {
+    if (mode_transition_queued == true) { // If transition for MODE button press
+      mode_transition_queued = false;
+      CONFIG.LIGHTSHOW_MODE++;
+      if (CONFIG.LIGHTSHOW_MODE >= NUM_MODES) {
+        CONFIG.LIGHTSHOW_MODE = 0;
+      }
+    }
+    if (noise_transition_queued == true) { // If transition for NOISE button press
+      noise_transition_queued = false;
+      // start noise cal
+      Serial.println("COLLECTING AMBIENT NOISE SAMPLES...");
+      propagate_noise_cal();
+      start_noise_cal();
+    }
+  }
+}
+
+void distort_exponential() {
+  for (uint8_t i = 0; i < 128; i++) {
+    float prog = i / 127.0;
+    float prog_distorted = prog * prog;
+    leds_temp[i] = lerp_led(prog_distorted, leds);
+  }
+  load_leds_from_temp();
+}
+
+void distort_logarithmic() {
+  for (uint8_t i = 0; i < 128; i++) {
+    float prog = i / 127.0;
+    float prog_distorted = sqrt(prog);
+    leds_temp[i] = lerp_led(prog_distorted, leds);
+  }
+  load_leds_from_temp();
+}
+
+void increase_saturation(uint8_t amount) {
+  for (uint8_t i = 0; i < 128; i++) {
+    CHSV hsv = rgb2hsv_approximate(leds[i]);
+    hsv.s = qadd8(hsv.s, amount);
+    leds[i] = hsv;
+  }
+}
+
+void fade_top_half(bool shifted = false) {
+  int16_t shift = 0;
+  if (shifted == true) {
+    shift -= 64;
+  }
+  for (uint8_t i = 0; i < 64; i++) {
+    float fade = i / 64.0;
+    //fade *= fade;
+
+    leds[(127 - i) + shift].r *= fade;
+    leds[(127 - i) + shift].g *= fade;
+    leds[(127 - i) + shift].b *= fade;
+  }
+}
 
 void update_retro_heat(uint32_t t_now_us) {
   static uint32_t t_last = 0;

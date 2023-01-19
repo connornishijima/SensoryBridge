@@ -57,38 +57,74 @@ void acquire_sample_chunk() {
   size_t bytes_read = 0;
   i2s_read(I2S_PORT, i2s_samples_raw, CONFIG.SAMPLES_PER_CHUNK * sizeof(int32_t), &bytes_read, portMAX_DELAY);
 
+  max_waveform_val = 0.0;
+
   // Scale I2S samples and store into history
   for (uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++) {
-    float sample = (i2s_samples_raw[i] * 0.000512) + 56000 - 5120;
+    int32_t sample = (i2s_samples_raw[i] * 0.000512) + 56000 - 5120;
+
+    sample = sample >> 2;
 
     if (sample > 32767) {  //clipping
       sample = 32767;
     } else if (sample < -32767) {
       sample = -32767;
     }
+    
+    int16_t sample_abs = abs(sample)-(CONFIG.SWEET_SPOT_MIN_LEVEL>>1);
+    if(sample_abs > max_waveform_val){
+      max_waveform_val = sample_abs;
+    }
 
-    sample_chunk[i] = sample/2;
+    waveform[i] = sample;
 
     if (stream_audio == true) {
       Serial.println(sample);
     }
+  }
+
+  if(max_waveform_val > max_waveform_val_follower){
+    float delta = max_waveform_val - max_waveform_val_follower;
+    max_waveform_val_follower += delta*0.25;
+  }
+  else if(max_waveform_val < max_waveform_val_follower){
+    float delta = max_waveform_val_follower - max_waveform_val;
+    max_waveform_val_follower -= delta*0.0025;
+
+    if(max_waveform_val_follower < CONFIG.SWEET_SPOT_MIN_LEVEL){
+      max_waveform_val_follower = CONFIG.SWEET_SPOT_MIN_LEVEL;
+    }
+  }
+  float waveform_peak_scaled_raw = max_waveform_val/max_waveform_val_follower;
+
+  if(waveform_peak_scaled_raw > waveform_peak_scaled){
+    float delta = waveform_peak_scaled_raw - waveform_peak_scaled;
+    waveform_peak_scaled += delta*0.25;
+  }
+  else if(waveform_peak_scaled_raw < waveform_peak_scaled){
+    float delta = waveform_peak_scaled - waveform_peak_scaled_raw;
+    waveform_peak_scaled -= delta*0.25;
+  }
+
+  // Use the maximum amplitude of the captured frame to set
+  // the Sweet Spot state. Think of this like a coordinate
+  // space where 0 is the center LED, -1 is the left, and
+  // +1 is the right. See run_sweet_spot() in led_utilities.h
+  // for how this value translates to the final LED brightnesses
+  if(max_waveform_val <= CONFIG.SWEET_SPOT_MIN_LEVEL){
+    sweet_spot_state = -1;
+  }
+  else if(max_waveform_val >= CONFIG.SWEET_SPOT_MAX_LEVEL){
+    sweet_spot_state = 1;
+  }
+  else{
+    sweet_spot_state = 0;
   }
   
   for (int i = 0; i < SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK; i++) {
     sample_window[i] = sample_window[i + CONFIG.SAMPLES_PER_CHUNK];
   }
   for (int i = SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK; i < SAMPLE_HISTORY_LENGTH; i++) {
-    sample_window[i] = sample_chunk[i - (SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK)];
+    sample_window[i] = waveform[i - (SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK)];
   }
-
-  /*
-  iter++;
-  if(iter >= 1000){
-    iter = 0;
-    for(uint16_t i = 0; i < SAMPLE_HISTORY_LENGTH; i++){
-      Serial.println(sample_window[i]);
-      delay(10);
-    }
-  }
-  */
 }

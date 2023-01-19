@@ -183,7 +183,7 @@ void log_fps(uint32_t t_now_us) {
 // you're rapidly cycling through modes for example.
 void check_settings(uint32_t t_now) {
   if (settings_updated) {
-    if (t_now - last_setting_change >= 3000) {
+    if (t_now - last_setting_change >= 10000) {
       save_config();
       settings_updated = false;
     }

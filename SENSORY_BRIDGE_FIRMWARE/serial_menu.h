@@ -108,6 +108,9 @@ void dump_info() {
   Serial.print("CONFIG.MIRROR_ENABLED: ");
   Serial.println(CONFIG.MIRROR_ENABLED);
 
+  Serial.print("CONFIG.CHROMAGRAM_BASS: ");
+  Serial.println(CONFIG.CHROMAGRAM_BASS);
+
   Serial.print("CONFIG.SAMPLE_RATE: ");
   Serial.println(CONFIG.SAMPLE_RATE);
 
@@ -137,6 +140,12 @@ void dump_info() {
 
   Serial.print("CONFIG.BOOT_ANIMATION: ");
   Serial.println(CONFIG.BOOT_ANIMATION);
+
+  Serial.print("CONFIG.SWEET_SPOT_MIN_LEVEL: ");
+  Serial.println(CONFIG.SWEET_SPOT_MIN_LEVEL);
+
+  Serial.print("CONFIG.SWEET_SPOT_MAX_LEVEL: ");
+  Serial.println(CONFIG.SWEET_SPOT_MAX_LEVEL);
 
   Serial.print("CONFIG.DC_OFFSET: ");
   Serial.println(CONFIG.DC_OFFSET);
@@ -247,7 +256,9 @@ void parse_command(char* command_buf) {
     Serial.println("           gain=[float or 'default'] | Sets the scaling of spectrogram data (>0.0 is brighter, <0.0 is darker)");
     Serial.println(" boot_animation=[true/false/default] | Enable or disable the boot animation");
     Serial.println("          set_main_unit=[true/false] | Sets if this unit is MAIN or not for SensorySync");
-
+    Serial.println("   sweet_spot_min=[int or 'default'] | Sets the minimum amplitude to be inside the 'Sweet Spot'");
+    Serial.println("   sweet_spot_max=[int or 'default'] | Sets the maximum amplitude to be inside the 'Sweet Spot'");
+    Serial.println("chromagram_bass=[true/false/default] | Toggles 'bass-only' chromagram mode");
   }
 
   // So that software can automatically identify this device -
@@ -489,6 +500,51 @@ void parse_command(char* command_buf) {
       save_config();
       Serial.print("BOOT_ANIMATION: ");
       Serial.println(CONFIG.BOOT_ANIMATION);
+    }
+
+    // Set Sweet Spot LOW threshold -------------------
+    else if (strcmp(command_type, "sweet_spot_min") == 0) {
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.SWEET_SPOT_MIN_LEVEL = CONFIG_DEFAULTS.SWEET_SPOT_MIN_LEVEL;
+      }
+      else {
+        CONFIG.SWEET_SPOT_MIN_LEVEL = atof(command_data);
+      }
+      
+      save_config();
+      Serial.print("SWEET_SPOT_MIN_LEVEL: ");
+      Serial.println(CONFIG.SWEET_SPOT_MIN_LEVEL);
+    }
+
+    // Set Sweet Spot HIGH threshold ------------------
+    else if (strcmp(command_type, "sweet_spot_max") == 0) {
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.SWEET_SPOT_MAX_LEVEL = CONFIG_DEFAULTS.SWEET_SPOT_MAX_LEVEL;
+      }
+      else {
+        CONFIG.SWEET_SPOT_MAX_LEVEL = atof(command_data);
+      }
+      
+      save_config();
+      Serial.print("SWEET_SPOT_MAX_LEVEL: ");
+      Serial.println(CONFIG.SWEET_SPOT_MAX_LEVEL);
+    }
+
+    // Toggle Bass-only Chromagram --------------------
+    else if (strcmp(command_type, "chromagram_bass") == 0) {
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.CHROMAGRAM_BASS = CONFIG_DEFAULTS.CHROMAGRAM_BASS;
+      }
+      else if (strcmp(command_data, "true") == 0) {
+        CONFIG.CHROMAGRAM_BASS = true;
+      } else if (strcmp(command_data, "false") == 0) {
+        CONFIG.CHROMAGRAM_BASS = false;
+      } else {
+        bad_command(command_type, command_data);
+      }
+      save_config();
+      Serial.print("CHROMAGRAM_BASS: ");
+      Serial.println(CONFIG.CHROMAGRAM_BASS);
     }
 
     // Stream a given value over Serial -----------------

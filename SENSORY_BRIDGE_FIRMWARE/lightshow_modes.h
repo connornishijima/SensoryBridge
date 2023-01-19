@@ -11,26 +11,38 @@ void light_mode_gdft() {
 
     float led_hue = 21.33333333 * i;  // Makes hue completely cycle once per octave
 
-    CRGB col = CRGB(0, 0, 0);
+    CRGB col1 = CRGB(0, 0, 0);
     hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
       CHSV(led_hue, 255, brightness_levels[i]),
-      col);
+      col1);
 
-    leds[i * 2 + 0] = col;  // Two LEDs at a time
-    leds[i * 2 + 1] = col;
+    CRGB col2 = CRGB(0, 0, 0);
+    hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
+      CHSV(led_hue + 10.66666666, 255, brightness_levels[i]),
+      col2);
+
+    leds[i * 2 + 0] = col1;  // Two LEDs at a time so that mirror mode works gracefully
+    leds[i * 2 + 1] = col2;
   }
 }
 
 void light_mode_gdft_chromagram() {
   for (uint16_t i = 0; i < 128; i++) {
     float prog = i / 128.0;
-    float level = interpolate(prog, note_chromagram, 12);
 
-    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
-      level = level * level;
+    float bin = 0.0;
+    if (CONFIG.CHROMAGRAM_BASS == false) {
+      bin = interpolate(prog, note_chromagram, 12);
+    }
+    else{
+      bin = interpolate(prog, note_chromagram_bass, 12);
     }
 
-    leds[i] = CHSV(255 * prog, 255, 255 * level);
+    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
+      bin = bin * bin;
+    }
+
+    leds[i] = CHSV(255 * prog, 255, 255 * bin);
   }
 }
 
@@ -43,37 +55,59 @@ void light_mode_bloom(bool fast_scroll) {
   CRGB sum_color = CRGB(0, 0, 0);
   for (uint8_t i = 0; i < 12; i++) {
     float prog = i / float(12);
-    float bin = note_chromagram[i];
 
-    //bin *= 2.0;
-
-    if (bin > 1.0) {
-      bin = 1.0;
+    float bin = 0.0;
+    if (CONFIG.CHROMAGRAM_BASS == false) {
+      bin = note_chromagram[i];// * (1.0 / chromagram_max_val);
     }
-
-    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER+2; s++) {
-      bin = bin * bin;
+    else {
+      bin = note_chromagram_bass[i] * (1.0 / chromagram_bass_max_val);
     }
 
     CRGB out_col;
     hsv2rgb_spectrum(
       CHSV(255 * prog, 255, led_share * bin),
       out_col);
+      
     sum_color += out_col;
   }
 
-  if (iter % 2 == 1 || fast_scroll == true) { // Render every other frame in slow mode, or all in fast mode
+  for (uint8_t s = 0; s < CONFIG.SQUARE_ITER - 1; s++) {
+    sum_color.r *= waveform_peak_scaled;
+    sum_color.g *= waveform_peak_scaled;
+    sum_color.b *= waveform_peak_scaled;
+  }
+
+  if (iter % 6 == 1) {
+    //fadeToBlackBy(leds_last, 128, 1);
+  }
+
+  if (fast_scroll == true) { // Fast mode scrolls two LEDs at a time
+    for (uint8_t i = 0; i < 126; i++) {
+      leds_temp[127 - i] = leds_last[127 - i - 2];
+    }
+
+    leds_temp[0] = sum_color; // New information goes here
+    leds_temp[1] = sum_color; // New information goes here
+  }
+  else { // Slow mode only scrolls one LED at a time
     for (uint8_t i = 0; i < 127; i++) {
       leds_temp[127 - i] = leds_last[127 - i - 1];
     }
+
+    leds_temp[0] = sum_color; // New information goes here
   }
-  else{ // Skip frame in slow mode
-    memcpy(leds_temp, leds_last, sizeof(CRGB)*128);
-  }
-  leds_temp[0] = sum_color; // New information goes here
 
   load_leds_from_temp();
   save_leds_to_last();
+
+  //fadeToBlackBy(leds, 128, 255-255*waveform_peak_scaled);
+
+  distort_logarithmic();
+  //distort_exponential();
+
+  fade_top_half(CONFIG.MIRROR_ENABLED); // fade at different location depending if mirroring is enabled
+  increase_saturation(16);
 }
 
 
@@ -85,7 +119,7 @@ void light_mode_bloom(bool fast_scroll) {
 
 /*
 
-void light_mode_gdft_retro(uint32_t t_now_us) {
+  void light_mode_gdft_retro(uint32_t t_now_us) {
   // SPECTROGRAM
   for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
     retro_heat_targets[i] = note_spectrogram_smooth[i];
@@ -109,9 +143,9 @@ void light_mode_gdft_retro(uint32_t t_now_us) {
 
     leds[i * 2 + 1] = leds[i * 2 + 0];
   }
-}
+  }
 
-void light_mode_gdft_chromagram() {
+  void light_mode_gdft_chromagram() {
   // CHROMAGRAM
   for (uint8_t i = 0; i < 128; i += 1) {
     float chroma_level = interpolate(i / 128.0, note_chromagram, 12);
@@ -120,9 +154,9 @@ void light_mode_gdft_chromagram() {
       leds[i]
     );
   }
-}
+  }
 
-void light_mode_gdft_with_peak_color_spreading() {
+  void light_mode_gdft_with_peak_color_spreading() {
   for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
     float bin = note_spectrogram_smooth[i];
     if (bin > 1.0) {
@@ -307,6 +341,6 @@ void light_mode_gdft_with_peak_color_spreading() {
     leds[i * 2 + 0] = col;
     leds[i * 2 + 1] = col;
   }
-}
+  }
 
 */
