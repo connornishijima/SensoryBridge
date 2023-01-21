@@ -150,9 +150,6 @@ void dump_info() {
   Serial.print("CONFIG.DC_OFFSET: ");
   Serial.println(CONFIG.DC_OFFSET);
 
-  Serial.print("CONFIG.WAVEFORM_NOISE_FLOOR: ");
-  Serial.println(CONFIG.WAVEFORM_NOISE_FLOOR);
-
   Serial.print("CONFIG.ESPNOW_CHANNEL: ");
   Serial.println(CONFIG.ESPNOW_CHANNEL);
 
