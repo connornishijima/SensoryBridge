@@ -2,6 +2,8 @@ void start_noise_cal() {
   Serial.print("STARTING NOISE CAL...");
   noise_complete = false;
   noise_iterations = 0;
+  dc_offset_sum = 0;
+  CONFIG.DC_OFFSET = 0;
   for (uint8_t i = 0; i < NUM_FREQS; i++) {
     noise_samples[i] = 0;
   }

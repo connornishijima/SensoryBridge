@@ -108,8 +108,8 @@ void dump_info() {
   Serial.print("CONFIG.MIRROR_ENABLED: ");
   Serial.println(CONFIG.MIRROR_ENABLED);
 
-  Serial.print("CONFIG.CHROMAGRAM_BASS: ");
-  Serial.println(CONFIG.CHROMAGRAM_BASS);
+  Serial.print("CONFIG.CHROMAGRAM_RANGE: ");
+  Serial.println(CONFIG.CHROMAGRAM_RANGE);
 
   Serial.print("CONFIG.SAMPLE_RATE: ");
   Serial.println(CONFIG.SAMPLE_RATE);
@@ -232,33 +232,33 @@ void parse_command(char* command_buf) {
   // Print help ---------------------------------------------
   else if (strcmp(command_buf, "h") == 0 || strcmp(command_buf, "H") == 0 || strcmp(command_buf, "help") == 0) {
 
-    Serial.println("SENSORY BRIDGE - Serial Menu ---------------------------------------");
+    Serial.println("SENSORY BRIDGE - Serial Menu ------------------------------------------------------------------------------------");
     Serial.println();
-    Serial.println("                                   v | Print firmware version number");
-    Serial.println("                               reset | Reboot Sensory Bridge");
-    Serial.println("                       factory_reset | Delete all configurations, reboot");
-    Serial.println("                       get_main_unit | Print if this unit is set to MAIN for SensorySync");
-    Serial.println("                                dump | Print tons of useful variables in realtime");
-    Serial.println("                                stop | Stops the output of any enabled streams");
-    Serial.println("                                 fps | Return the average FPS");
-
-    Serial.println("                       stream=[type] | Stream live data to a Serial Plotter.");
-    Serial.println("                                       Options are: audio, fps, max_mags, max_mags_followers, magnitudes, spectrogram");
-    Serial.println("     led_type=['neopixel'/'dotstar'] | Sets which LED protocol to use, 3 wire or 4 wire");
-    Serial.println("        led_count=[int or 'default'] | Sets how many LEDs your display will use (native resolution is 128)");
-    Serial.println("                  debug=[true/false] | Enables debug mode, where functions are timed");
-    Serial.println("       sample_rate=[hz or 'default'] | Sets the microphone sample rate");
-    Serial.println("     note_offset=[0-32 or 'default'] | Sets the lowest note, as a positive offset from A1 (55.0Hz)");
-    Serial.println("      square_iter=[int or 'default'] | Sets the number of times the LED output is squared (contrast)");
-    Serial.println("  magnitude_floor=[int or 'default'] | Sets minimum magnitude a frequency bin must have to contribute the show");
-    Serial.println("   max_block_size=[int or 'default'] | Sets the maximum number of samples used to compute frequency data");
-    Serial.println("samples_per_chunk=[int or 'default'] | Sets the number of samples collected every frame");
-    Serial.println("           gain=[float or 'default'] | Sets the scaling of spectrogram data (>0.0 is brighter, <0.0 is darker)");
-    Serial.println(" boot_animation=[true/false/default] | Enable or disable the boot animation");
-    Serial.println("          set_main_unit=[true/false] | Sets if this unit is MAIN or not for SensorySync");
-    Serial.println("   sweet_spot_min=[int or 'default'] | Sets the minimum amplitude to be inside the 'Sweet Spot'");
-    Serial.println("   sweet_spot_max=[int or 'default'] | Sets the maximum amplitude to be inside the 'Sweet Spot'");
-    Serial.println("chromagram_bass=[true/false/default] | Toggles 'bass-only' chromagram mode");
+    Serial.println("                                           v | Print firmware version number");
+    Serial.println("                                       reset | Reboot Sensory Bridge");
+    Serial.println("                               factory_reset | Delete all configurations, reboot");
+    Serial.println("                               get_main_unit | Print if this unit is set to MAIN for SensorySync");
+    Serial.println("                                        dump | Print tons of useful variables in realtime");
+    Serial.println("                                        stop | Stops the output of any enabled streams");
+    Serial.println("                                         fps | Return the average FPS");
+    Serial.println("                               stream=[type] | Stream live data to a Serial Plotter.");
+    Serial.println("                                               Options are: audio, fps, max_mags, max_mags_followers, magnitudes, spectrogram");
+    Serial.println("             led_type=['neopixel'/'dotstar'] | Sets which LED protocol to use, 3 wire or 4 wire");
+    Serial.println("                led_count=[int or 'default'] | Sets how many LEDs your display will use (native resolution is 128)");
+    Serial.println("                          debug=[true/false] | Enables debug mode, where functions are timed");
+    Serial.println("               sample_rate=[hz or 'default'] | Sets the microphone sample rate");
+    Serial.println("             note_offset=[0-32 or 'default'] | Sets the lowest note, as a positive offset from A1 (55.0Hz)");
+    Serial.println("              square_iter=[int or 'default'] | Sets the number of times the LED output is squared (contrast)");
+    Serial.println("          magnitude_floor=[int or 'default'] | Sets minimum magnitude a frequency bin must have to contribute the show");
+    Serial.println("           max_block_size=[int or 'default'] | Sets the maximum number of samples used to compute frequency data");
+    Serial.println("        samples_per_chunk=[int or 'default'] | Sets the number of samples collected every frame");
+    Serial.println("                   gain=[float or 'default'] | Sets the scaling of spectrogram data (>0.0 is brighter, <0.0 is darker)");
+    Serial.println("         boot_animation=[true/false/default] | Enable or disable the boot animation");
+    Serial.println("                  set_main_unit=[true/false] | Sets if this unit is MAIN or not for SensorySync");
+    Serial.println("           sweet_spot_min=[int or 'default'] | Sets the minimum amplitude to be inside the 'Sweet Spot'");
+    Serial.println("           sweet_spot_max=[int or 'default'] | Sets the maximum amplitude to be inside the 'Sweet Spot'");
+    Serial.println("         chromagram_range=[int or 'default'] | Range between 1 and 64, how many notes at the bottom of the");
+    Serial.println("                                               spectrogram should be considered in chromagram sums");
   }
 
   // So that software can automatically identify this device -
@@ -530,21 +530,17 @@ void parse_command(char* command_buf) {
       Serial.println(CONFIG.SWEET_SPOT_MAX_LEVEL);
     }
 
-    // Toggle Bass-only Chromagram --------------------
-    else if (strcmp(command_type, "chromagram_bass") == 0) {
+    // Set Chromagram Range ---------------
+    else if (strcmp(command_type, "chromagram_range") == 0) {
       if (strcmp(command_data, "default") == 0) {
-        CONFIG.CHROMAGRAM_BASS = CONFIG_DEFAULTS.CHROMAGRAM_BASS;
+        CONFIG.CHROMAGRAM_RANGE = CONFIG_DEFAULTS.CHROMAGRAM_RANGE;
       }
-      else if (strcmp(command_data, "true") == 0) {
-        CONFIG.CHROMAGRAM_BASS = true;
-      } else if (strcmp(command_data, "false") == 0) {
-        CONFIG.CHROMAGRAM_BASS = false;
-      } else {
-        bad_command(command_type, command_data);
+      else {
+        CONFIG.CHROMAGRAM_RANGE = atof(command_data);
       }
       save_config();
-      Serial.print("CHROMAGRAM_BASS: ");
-      Serial.println(CONFIG.CHROMAGRAM_BASS);
+      Serial.print("CHROMAGRAM_RANGE: ");
+      Serial.println(CONFIG.CHROMAGRAM_RANGE);
     }
 
     // Stream a given value over Serial -----------------

@@ -1,11 +1,46 @@
 extern void propagate_noise_cal();
 extern void start_noise_cal();
 
+void run_sweet_spot() {
+  static float sweet_spot_brightness = 0.0; // init to zero for first fade in
+
+  if (sweet_spot_brightness < 1.0) {
+    sweet_spot_brightness += 0.05;
+  }
+
+  if (sweet_spot_state > sweet_spot_state_follower) {
+    float delta = sweet_spot_state - sweet_spot_state_follower;
+    sweet_spot_state_follower += delta * 0.05;
+  }
+  else if (sweet_spot_state < sweet_spot_state_follower) {
+    float delta = sweet_spot_state_follower - sweet_spot_state;
+    sweet_spot_state_follower -= delta * 0.05;
+  }
+
+  uint16_t led_power[3] = {0, 0, 0};
+  for (float i = -1; i <= 1; i++) {
+    float position_delta = fabs(i - sweet_spot_state_follower);
+    if (position_delta > 1.0) {
+      position_delta = 1.0;
+    }
+
+    float led_level = 1.0 - position_delta;
+    led_level *= led_level;
+    //                                                Never fully dim
+    led_power[uint8_t(i + 1)] = 4095 * led_level * (0.1+silent_scale*0.9) * sweet_spot_brightness * CONFIG.PHOTONS;
+  }
+
+  ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   led_power[0]);
+  ledcWrite(SWEET_SPOT_CENTER_CHANNEL, led_power[1]);
+  ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  led_power[2]);
+}
+
 // Returns the linear interpolation of a floating point index in a CRGB array
 // index is in the range of 0.0-1.0
 CRGB lerp_led(float index, CRGB* led_array) {
-  float index_f = index * 127.0;
-  if (index_f > 127.0) {
+  float NUM_LEDS_NATIVE = NATIVE_RESOLUTION-1; // count from zero
+  float index_f = index * NUM_LEDS_NATIVE;
+  if (index_f > NUM_LEDS_NATIVE) {
     return CRGB(0, 0, 0);
   }
   int index_i = (int)index_f;
@@ -22,7 +57,7 @@ CRGB lerp_led(float index, CRGB* led_array) {
 }
 
 void show_leds() {
-  if (STRIP_LED_COUNT == 128) {
+  if (STRIP_LED_COUNT == NATIVE_RESOLUTION) {
     memcpy(leds_out, leds, sizeof(leds));
   } else {  // If not native resolution, use interpolation
     for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
@@ -31,7 +66,7 @@ void show_leds() {
     }
   }
   // PHOTONS knob is squared and applied here:
-  FastLED.setBrightness((255 * MASTER_BRIGHTNESS) * (CONFIG.PHOTONS * CONFIG.PHOTONS));
+  FastLED.setBrightness((255 * MASTER_BRIGHTNESS) * (CONFIG.PHOTONS * CONFIG.PHOTONS) * silent_scale);
   FastLED.show();
 }
 
@@ -45,7 +80,7 @@ void init_leds() {
 
   FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
 
-  for (uint8_t x = 0; x < 128; x++) {
+  for (uint8_t x = 0; x < NATIVE_RESOLUTION; x++) {
     leds[x] = CRGB(0, 0, 0);
   }
   show_leds();
@@ -76,19 +111,19 @@ void load_leds_from_temp() {
 }
 
 void blocking_flash(CRGB col) {
-  for (uint8_t i = 0; i < 128; i++) {
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
     leds[i] = CRGB(0, 0, 0);
   }
 
   const uint8_t flash_times = 2;
   for (uint8_t f = 0; f < flash_times; f++) {
-    for (uint8_t i = 0 + 48; i < 128 - 48; i++) {
+    for (uint8_t i = 0 + 48; i < NATIVE_RESOLUTION - 48; i++) {
       leds[i] = col;
     }
     show_leds();
     delay(150);
 
-    for (uint8_t i = 0; i < 128; i++) {
+    for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
       leds[i] = CRGB(0, 0, 0);
     }
     show_leds();
@@ -97,7 +132,7 @@ void blocking_flash(CRGB col) {
 }
 
 void clear_all_led_buffers() {
-  for (uint8_t i = 0; i < 128; i++) {
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
     leds[i] = CRGB(0, 0, 0);
     leds_temp[i] = CRGB(0, 0, 0);
     leds_last[i] = CRGB(0, 0, 0);
@@ -111,33 +146,33 @@ void clear_all_led_buffers() {
 }
 
 void scale_image_to_half() {
-  for (uint16_t i = 0; i < 64; i++) {
+  for (uint16_t i = 0; i < (NATIVE_RESOLUTION>>1); i++) {
     leds[i] = leds[i << 1];
   }
 }
 
 void shift_leds_up(uint16_t offset) {
   memcpy(leds_temp, leds, sizeof(leds));
-  memcpy(leds + offset, leds_temp, (128 - offset) * sizeof(CRGB));
+  memcpy(leds + offset, leds_temp, (NATIVE_RESOLUTION - offset) * sizeof(CRGB));
   memset(leds, 0, offset * sizeof(CRGB));
 }
 
 
 void shift_leds_down(uint16_t offset) {
-  memcpy(leds, leds + offset, (128 - offset) * sizeof(CRGB));
-  memset(leds + (128 - offset), 0, offset * sizeof(CRGB));
+  memcpy(leds, leds + offset, (NATIVE_RESOLUTION - offset) * sizeof(CRGB));
+  memset(leds + (NATIVE_RESOLUTION - offset), 0, offset * sizeof(CRGB));
 }
 
 void mirror_image_upwards() {
-  for (uint8_t i = 0; i < 64; i++) {
+  for (uint8_t i = 0; i < (NATIVE_RESOLUTION>>1); i++) {
     leds_temp[i] = leds[i];
-    leds_temp[127 - i] = leds[i];
+    leds_temp[(NATIVE_RESOLUTION-1) - i] = leds[i];
   }
   load_leds_from_temp();
 }
 
 void mirror_image_downwards() {
-  for (uint8_t i = 0; i < 64; i++) {
+  for (uint8_t i = 0; i < (NATIVE_RESOLUTION>>1); i++) {
     leds_temp[64 + i] = leds[64 + i];
     leds_temp[63 - i] = leds[64 + i];
   }
@@ -161,8 +196,8 @@ void intro_animation() {
     ledcWrite(SWEET_SPOT_RIGHT_CHANNEL, brightness * 4096);
 
     float pos = (cos(progress * 5) + 1) / 2.0;
-    float pos_whole = pos * 128;
-    for (uint8_t i = 0; i < 128; i++) {
+    float pos_whole = pos * NATIVE_RESOLUTION;
+    for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
       float delta = fabs(pos_whole - i);
       if (delta > 5.0) {
         delta = 5.0;
@@ -223,8 +258,8 @@ void intro_animation() {
       particles[p].phase += particles[p].speed;
 
       float pos = (sin(particles[p].phase * 5) + 1) / 2.0;
-      float pos_whole = pos * 128;
-      for (uint8_t i = 0; i < 128; i++) {
+      float pos_whole = pos * NATIVE_RESOLUTION;
+      for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
         float delta = fabs(pos_whole - i);
         if (delta > 10.0) {
           delta = 10.0;
@@ -245,41 +280,6 @@ void intro_animation() {
   ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   0);
   ledcWrite(SWEET_SPOT_CENTER_CHANNEL, 0);
   ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  0);
-}
-
-void run_sweet_spot() {
-  static float sweet_spot_brightness = 0.0; // init to zero for first fade in
-
-  if (sweet_spot_brightness < 1.0) {
-    sweet_spot_brightness += 0.05;
-  }
-
-  if (sweet_spot_state > sweet_spot_state_follower) {
-    float delta = sweet_spot_state - sweet_spot_state_follower;
-    sweet_spot_state_follower += delta * 0.05;
-  }
-  else if (sweet_spot_state < sweet_spot_state_follower) {
-    float delta = sweet_spot_state_follower - sweet_spot_state;
-    sweet_spot_state_follower -= delta * 0.05;
-  }
-
-  uint16_t led_power[3] = {0, 0, 0};
-
-  for (float i = -1; i <= 1; i++) {
-    float position_delta = fabs(i - sweet_spot_state_follower);
-    if (position_delta > 1.0) {
-      position_delta = 1.0;
-    }
-
-    float led_level = 1.0 - position_delta;
-    led_level *= led_level;
-
-    led_power[uint8_t(i + 1)] = 4095 * led_level * sweet_spot_brightness * CONFIG.PHOTONS;
-  }
-
-  ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   led_power[0]);
-  ledcWrite(SWEET_SPOT_CENTER_CHANNEL, led_power[1]);
-  ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  led_power[2]);
 }
 
 void run_transition_fade() {
@@ -309,8 +309,8 @@ void run_transition_fade() {
 }
 
 void distort_exponential() {
-  for (uint8_t i = 0; i < 128; i++) {
-    float prog = i / 127.0;
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
+    float prog = i / float(NATIVE_RESOLUTION-1);
     float prog_distorted = prog * prog;
     leds_temp[i] = lerp_led(prog_distorted, leds);
   }
@@ -318,8 +318,8 @@ void distort_exponential() {
 }
 
 void distort_logarithmic() {
-  for (uint8_t i = 0; i < 128; i++) {
-    float prog = i / 127.0;
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
+    float prog = i / float(NATIVE_RESOLUTION-1);
     float prog_distorted = sqrt(prog);
     leds_temp[i] = lerp_led(prog_distorted, leds);
   }
@@ -327,7 +327,7 @@ void distort_logarithmic() {
 }
 
 void increase_saturation(uint8_t amount) {
-  for (uint8_t i = 0; i < 128; i++) {
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
     CHSV hsv = rgb2hsv_approximate(leds[i]);
     hsv.s = qadd8(hsv.s, amount);
     leds[i] = hsv;
@@ -339,70 +339,11 @@ void fade_top_half(bool shifted = false) {
   if (shifted == true) {
     shift -= 64;
   }
-  for (uint8_t i = 0; i < 64; i++) {
-    float fade = i / 64.0;
-    //fade *= fade;
+  for (uint8_t i = 0; i < (NATIVE_RESOLUTION>>1); i++) {
+    float fade = i / float(NATIVE_RESOLUTION>>1);
 
-    leds[(127 - i) + shift].r *= fade;
-    leds[(127 - i) + shift].g *= fade;
-    leds[(127 - i) + shift].b *= fade;
-  }
-}
-
-void update_retro_heat(uint32_t t_now_us) {
-  static uint32_t t_last = 0;
-
-  float heat_speed = 0.01400;
-  float cool_speed = 0.00875;
-
-  if (t_last == 0) {
-    // do nothing on first frame
-  } else {
-    uint32_t delta_us = t_now_us - t_last;
-    float time_scale = delta_us / 1000.0;
-
-    float heat_speed_scaled = heat_speed * time_scale;
-    float cool_speed_scaled = cool_speed * time_scale;
-
-    for (uint16_t i = 0; i < NUM_FREQS; i++) {
-      float heat_target_capped = retro_heat_targets[i];
-      if (heat_target_capped > 1.0) {
-        heat_target_capped = 1.0;
-      } else if (heat_target_capped < 0.0) {
-        heat_target_capped = 0.0;
-      }
-
-      if (heat_target_capped > retro_bulbs[i]) {
-        retro_bulbs[i] += heat_speed_scaled;
-
-        if (retro_bulbs[i] > heat_target_capped) {
-          retro_bulbs[i] = heat_target_capped;
-        }
-      } else if (heat_target_capped < retro_bulbs[i]) {
-        retro_bulbs[i] -= cool_speed_scaled;
-
-        if (retro_bulbs[i] < heat_target_capped) {
-          retro_bulbs[i] = heat_target_capped;
-        }
-      }
-    }
-  }
-
-  t_last = t_now_us;
-}
-
-
-void render_retro_heat() {
-  for (uint8_t i = 0; i < NUM_FREQS; i++) {
-    float heat_val_f = sqrtf(retro_bulbs[i]);
-    uint8_t heat_index = uint8_t(heat_val_f * 125);
-
-    CRGB heat_col = incandecsent_lookup[heat_index];
-    CRGB white = CRGB(2 * heat_val_f, 2 * heat_val_f, 2 * heat_val_f);
-
-    heat_col += white;
-
-    leds[i * 2 + 0] = heat_col;
-    leds[i * 2 + 1] = heat_col;
+    leds[(NATIVE_RESOLUTION - 1 - i) + shift].r *= fade;
+    leds[(NATIVE_RESOLUTION - 1 - i) + shift].g *= fade;
+    leds[(NATIVE_RESOLUTION - 1 - i) + shift].b *= fade;
   }
 }

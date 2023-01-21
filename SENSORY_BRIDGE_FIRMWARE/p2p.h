@@ -27,7 +27,7 @@ struct SB_COMMAND_SYNC_SETTINGS {
   float BASE_HUE;
   uint8_t LIGHTSHOW_MODE;
   uint8_t MIRROR_ENABLED;
-  uint8_t CHROMAGRAM_BASS;
+  uint8_t CHROMAGRAM_RANGE;
 };
 
 struct SB_COMMAND_TRIGGER_NOISE_CAL {
@@ -70,7 +70,7 @@ void sync_settings(uint32_t t_now) {
   setting.BASE_HUE = CONFIG.BASE_HUE;
   setting.LIGHTSHOW_MODE = CONFIG.LIGHTSHOW_MODE;
   setting.MIRROR_ENABLED = CONFIG.MIRROR_ENABLED;
-  setting.CHROMAGRAM_BASS = CONFIG.CHROMAGRAM_BASS;
+  setting.CHROMAGRAM_RANGE = CONFIG.CHROMAGRAM_RANGE;
 
   const uint8_t *peer_addr = broadcast_peer.peer_addr;
   esp_now_send(peer_addr, (uint8_t *)&setting, sizeof(SB_COMMAND_SYNC_SETTINGS));
@@ -141,7 +141,7 @@ void on_data_rx(const uint8_t *mac_addr, const uint8_t *incoming_data, int len) 
         CONFIG.BASE_HUE = settings.BASE_HUE;
         CONFIG.LIGHTSHOW_MODE = settings.LIGHTSHOW_MODE;
         CONFIG.MIRROR_ENABLED = settings.MIRROR_ENABLED;
-        CONFIG.CHROMAGRAM_BASS = settings.CHROMAGRAM_BASS;
+        CONFIG.CHROMAGRAM_RANGE = settings.CHROMAGRAM_RANGE;
       }
     } else if (command_type == COMMAND_TRIGGER_NOISE_CAL) {
       if (CONFIG.IS_MAIN_UNIT == false) {

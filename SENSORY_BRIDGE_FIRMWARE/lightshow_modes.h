@@ -27,16 +27,10 @@ void light_mode_gdft() {
 }
 
 void light_mode_gdft_chromagram() {
-  for (uint16_t i = 0; i < 128; i++) {
-    float prog = i / 128.0;
+  for (uint16_t i = 0; i < NATIVE_RESOLUTION; i++) {
+    float prog = i / float(NATIVE_RESOLUTION);
 
-    float bin = 0.0;
-    if (CONFIG.CHROMAGRAM_BASS == false) {
-      bin = interpolate(prog, note_chromagram, 12);
-    }
-    else{
-      bin = interpolate(prog, note_chromagram_bass, 12);
-    }
+    float bin = interpolate(prog, note_chromagram, 12);
 
     for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
       bin = bin * bin;
@@ -56,19 +50,13 @@ void light_mode_bloom(bool fast_scroll) {
   for (uint8_t i = 0; i < 12; i++) {
     float prog = i / float(12);
 
-    float bin = 0.0;
-    if (CONFIG.CHROMAGRAM_BASS == false) {
-      bin = note_chromagram[i];// * (1.0 / chromagram_max_val);
-    }
-    else {
-      bin = note_chromagram_bass[i] * (1.0 / chromagram_bass_max_val);
-    }
+    float bin = note_chromagram[i]; // * (1.0 / chromagram_max_val);
 
     CRGB out_col;
     hsv2rgb_spectrum(
       CHSV(255 * prog, 255, led_share * bin),
       out_col);
-      
+
     sum_color += out_col;
   }
 
@@ -83,16 +71,16 @@ void light_mode_bloom(bool fast_scroll) {
   }
 
   if (fast_scroll == true) { // Fast mode scrolls two LEDs at a time
-    for (uint8_t i = 0; i < 126; i++) {
-      leds_temp[127 - i] = leds_last[127 - i - 2];
+    for (uint8_t i = 0; i < NATIVE_RESOLUTION - 2; i++) {
+      leds_temp[(NATIVE_RESOLUTION - 1) - i] = leds_last[(NATIVE_RESOLUTION - 1) - i - 2];
     }
 
     leds_temp[0] = sum_color; // New information goes here
     leds_temp[1] = sum_color; // New information goes here
   }
   else { // Slow mode only scrolls one LED at a time
-    for (uint8_t i = 0; i < 127; i++) {
-      leds_temp[127 - i] = leds_last[127 - i - 1];
+    for (uint8_t i = 0; i < NATIVE_RESOLUTION - 1; i++) {
+      leds_temp[(NATIVE_RESOLUTION - 1) - i] = leds_last[(NATIVE_RESOLUTION - 1) - i - 1];
     }
 
     leds_temp[0] = sum_color; // New information goes here
@@ -107,240 +95,250 @@ void light_mode_bloom(bool fast_scroll) {
   //distort_exponential();
 
   fade_top_half(CONFIG.MIRROR_ENABLED); // fade at different location depending if mirroring is enabled
-  increase_saturation(16);
+  increase_saturation(32);
 }
 
+void light_mode_waveform() {
+  const float led_share = 255 / float(12);
+  static float waveform_peak_scaled_last;
+  static float waveform_last[1024] = { 0 };
+  static float sum_color_last[3] = {0, 0, 0};
 
-// ----------------------------------------------------------------------------
-//
-// (Work in progress code below, may delete later)
-//
-// ----------------------------------------------------------------------------
+  waveform_peak_scaled_last = (waveform_peak_scaled * 0.05 + waveform_peak_scaled_last * 0.95);
 
-/*
+  CRGB sum_color = CRGB(0, 0, 0);
+  for (uint8_t c = 0; c < 12; c++) {
+    float prog = c / float(12);
+    float bin = note_chromagram[c]; // * (1.0 / chromagram_max_val);
 
-  void light_mode_gdft_retro(uint32_t t_now_us) {
-  // SPECTROGRAM
-  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
-    retro_heat_targets[i] = note_spectrogram_smooth[i];
-  }
-
-  update_retro_heat(t_now_us);
-  render_retro_heat();
-
-  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-    float hue = (21.33333333) * i;
-    CRGB filter = CHSV(hue, 215, 255);
-
-    filter.r *=  0.5;
-
-    float b_val = leds[i * 2 + 0].b / 255.0;
-    leds[i * 2 + 0].b = sqrtf(b_val) * 255;
-
-    leds[i * 2 + 0].r = (leds[i * 2 + 0].r * 0.05) + scale8(leds[i * 2 + 0].r, filter.r) * 0.95;
-    leds[i * 2 + 0].g = (leds[i * 2 + 0].g * 0.05) + scale8(leds[i * 2 + 0].g, filter.g) * 0.95;
-    leds[i * 2 + 0].b = (leds[i * 2 + 0].b * 0.05) + scale8(leds[i * 2 + 0].b, filter.b) * 0.95;
-
-    leds[i * 2 + 1] = leds[i * 2 + 0];
-  }
-  }
-
-  void light_mode_gdft_chromagram() {
-  // CHROMAGRAM
-  for (uint8_t i = 0; i < 128; i += 1) {
-    float chroma_level = interpolate(i / 128.0, note_chromagram, 12);
+    CRGB out_col;
     hsv2rgb_spectrum(
-      CHSV(21.33333333333333 * (i / 10.0), 255, 255 * chroma_level),
-      leds[i]
-    );
-  }
-  }
+      CHSV(255 * prog, 255, led_share * bin),
+      out_col);
 
-  void light_mode_gdft_with_peak_color_spreading() {
-  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
-    float bin = note_spectrogram_smooth[i];
-    if (bin > 1.0) {
-      bin = 1.0;
-    }
-    float bright = 255 * (bin * bin);
-    brightness_levels[i] = bright;
+    sum_color += out_col;
   }
 
-  enum peak_states {
-    UNSOLVED,
-    UNEXPANDED,
-    EXPANDED
-  };
+  CHSV hsv = rgb2hsv_approximate(sum_color);
+  hsv.s = qadd8(hsv.s, 64);
+  sum_color = hsv;
 
-  static float hue_positions_follower[NUM_FREQS] = { 0 };
+  float sum_color_float[3] = {sum_color.r, sum_color.g, sum_color.b};
 
-  //Serial.println("IDENTIFY PEAKS -----------------------");
+  sum_color_float[0] = sum_color_float[0] * 0.05 + sum_color_last[0] * 0.95;
+  sum_color_float[1] = sum_color_float[1] * 0.05 + sum_color_last[1] * 0.95;
+  sum_color_float[2] = sum_color_float[2] * 0.05 + sum_color_last[2] * 0.95;
 
-  uint8_t peak_positions   [NUM_FREQS] = { UNSOLVED };
-  float   hue_positions    [NUM_FREQS] = { -1       };
-  bool    solved_map       [NUM_FREQS] = { false    };
+  sum_color_last[0] = sum_color_float[0];
+  sum_color_last[1] = sum_color_float[1];
+  sum_color_last[2] = sum_color_float[2];
 
-  bool debug_map[NUM_FREQS] = { false };
-
-  uint8_t peak_index = 0;
-
-  fadeToBlackBy( leds, 128, 255 );
-
-  bool in_peak = false;
-  uint8_t start_pos = 0;
-  uint8_t end_pos = 0;
-  bool    rising  = false;
-  bool    falling = false;
-
-  uint8_t last_val = 0;
-  uint8_t peaks_found = 0;
-  uint8_t peak_start = 0;
-  uint8_t peak_end   = 0;
-  bool peak_complete = false;
-
-  for (uint8_t i = 0; i < NUM_FREQS; i++) {
-    if (brightness_levels[i] == 0) { // if blank, consider solved
-      if (falling == true) {
-        falling = false;
-        peak_end = i;
-        peak_complete = true;
-      }
-      else {
-        peak_start = i;
-      }
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
+    float waveform_sample = 0.0;
+    for (uint8_t s = 0; s < 4; s++) {
+      waveform_sample += waveform_history[s][i];
     }
-    else { // if not blank (peak area)
-      if (brightness_levels[i] > last_val) { // brightness rising
-        if (rising == false) {
-          if (falling == true) { // didn't fall to full zero, but this is the end of a peak
-            falling = false;
-            peak_end = i;
-            peak_complete = true;
-          }
-          else {
-            rising = true;
-            peak_start = i;
-          }
-        }
+    waveform_sample /= 4.0;
+    float input_wave_sample = (waveform_sample / 512.0);
+
+    //----------------------
+
+    float smoothing = (0.1 + CONFIG.MOOD * 0.9) * 0.05;
+
+    waveform_last[i] = input_wave_sample * (smoothing) + waveform_last[i] * (1.0 - smoothing);
+
+    /*
+
+      if(input_wave_sample > waveform_last[i]){
+      float delta = input_wave_sample-waveform_last[i];
+      if(delta > smoothing){
+        input_wave_sample = waveform_last[i] + smoothing;
       }
-      else if (brightness_levels[i] < last_val) { // brightness falling
-        if (rising == true) {
-          rising = false;
-          falling = true;
-        }
       }
-      else {
-        // stayed the same since last pixel, above zero
+      else if(input_wave_sample < waveform_last[i]){
+      float delta = waveform_last[i]-input_wave_sample;
+      if(delta > smoothing){
+        input_wave_sample = waveform_last[i] - smoothing;
       }
+      }
+
+      waveform_last[i] = input_wave_sample;
+    */
+
+    //----------------------
+
+    float peak = waveform_peak_scaled_last * 4.0;
+    if (peak > 1.0) {
+      peak = 1.0;
     }
 
-    if (peak_complete == true) {
-      peak_complete = false;
-      uint8_t peak_center = (peak_start + peak_end) / 2.0;
-
-      hue_positions[peak_center] = 21.33333333 * peak_center; // hit peak here, set color
-      while (hue_positions[peak_center] >= 256.0) {
-        hue_positions[peak_center] -= 256.0;
-      }
-      if (hue_positions[peak_center] > 255.0) {
-        hue_positions[peak_center] = 255.0;
-      }
-      peak_positions[peak_center] = UNEXPANDED;
-      debug_map[peak_center]  = true;
-      peaks_found++;
-      //Serial.print("PEAK FOUND AT ");
-      //Serial.println(peak_center);
+    float output_brightness = (waveform_last[i]);
+    if (output_brightness > 1.0) {
+      output_brightness = 1.0;
     }
 
-    last_val = brightness_levels[i];
+    output_brightness = 0.5 + output_brightness * 0.5;
+    if (output_brightness > 1.0) {
+      output_brightness = 1.0;
+    }
+    else if (output_brightness < 0.0) {
+      output_brightness = 0.0;
+    }
+
+    output_brightness *= peak;
+
+    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
+      output_brightness *= output_brightness;
+    }
+
+    leds[i] = CRGB(
+                sum_color_float[0] * output_brightness,
+                sum_color_float[1] * output_brightness,
+                sum_color_float[2] * output_brightness
+              );
+  }
+}
+
+void light_mode_vu() {
+  const float led_share = 255 / float(12);
+  static float sum_color_last[3] = {0, 0, 0};
+
+  float smoothing = (0.1 + CONFIG.MOOD * 0.9) * 0.25;
+  float led_pos = waveform_peak_scaled * (NATIVE_RESOLUTION - 1);
+  static float led_pos_smooth = 0.0;
+
+  led_pos_smooth = led_pos * (smoothing) + led_pos_smooth * (1.0 - smoothing);
+
+  if(led_pos_smooth > 126){
+    led_pos_smooth = 126;
   }
 
-  if (peaks_found > 0) {
-    //Serial.println("SOLVE EXPANSION -----------------------");
-    bool solved = false;
-    uint8_t pointer_index = 0;
-    while (solved == false) {
-      int16_t this_index  = pointer_index;
-      if (peak_positions[this_index] == UNEXPANDED) { // if this pixel is an unexpanded peak
-        float expand_hue = hue_positions[this_index];
+  CRGB sum_color = CRGB(0, 0, 0);
+  for (uint8_t c = 0; c < 12; c++) {
+    float prog = c / float(12);
+    float bin = note_chromagram[c] * (1.0 / chromagram_max_val);
 
-        uint16_t expansion_size = 1;
-        bool peak_solved = false;
-        while (peak_solved == false) {
-          int16_t left_index  = pointer_index - expansion_size;
-          int16_t right_index = pointer_index + expansion_size;
-
-          if (left_index >= 0) {
-            if (peak_positions[left_index ] != UNSOLVED) {
-              peak_solved = true;
-            }
-            if (peak_positions[right_index] != UNSOLVED) {
-              peak_solved = true;
-            }
-          }
-
-          if (peak_solved == false) {
-            expansion_size += 1;
-          }
-        }
-
-        uint16_t half_expansion = expansion_size / 2;
-
-        int16_t left_index  = pointer_index - half_expansion;
-        int16_t right_index = pointer_index + half_expansion;
-
-        if (left_index < 0) {
-          left_index = 0;
-        }
-        if (right_index >= NUM_FREQS) {
-          right_index = NUM_FREQS - 1;
-        }
-
-        for (uint8_t e = left_index; e <= right_index; e++) {
-          hue_positions[e] = expand_hue;
-        }
-
-        peak_positions[this_index] = EXPANDED; // peak solved and expanded
-      }
-
-      pointer_index++;
-      if (pointer_index >= NUM_FREQS) {
-        pointer_index = 0;
-      }
-
-      solved = true; // temporary
-      for (uint8_t i = 0; i < NUM_FREQS; i++) { // check for holes in expansion
-        if (peak_positions[i] == UNEXPANDED) { // if hole, not solved yet
-          solved = false;
-        }
-      }
-    }
-  }
-
-  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
-    if (hue_positions[i] > hue_positions_follower[i]) {
-      float delta = hue_positions[i] - hue_positions_follower[i];
-      hue_positions_follower[i] += delta * 0.1;
-    }
-    if (hue_positions[i] < hue_positions_follower[i]) {
-      float delta = hue_positions_follower[i] - hue_positions[i];
-      hue_positions_follower[i] -= delta * 0.1;
-    }
-  }
-
-  for (uint8_t i = 0; i < NUM_FREQS; i += FREQUENCY_HOP) {
-    float   led_hue = 21.33333333 * i; //hue_positions_follower[i];
-    uint8_t led_brightness = brightness_levels[i];
-
-    CRGB col = CRGB(0, 0, 0);
+    CRGB out_col;
     hsv2rgb_spectrum(
-      CHSV(led_hue, 255, led_brightness),
-      col
-    );
+      CHSV(255 * prog, 255, led_share * bin),
+      out_col);
 
-    leds[i * 2 + 0] = col;
-    leds[i * 2 + 1] = col;
-  }
+    sum_color += out_col;
   }
 
-*/
+  CHSV hsv = rgb2hsv_approximate(sum_color);
+  hsv.s = qadd8(hsv.s, 64);
+  sum_color = hsv;
+
+  float sum_color_float[3] = {sum_color.r, sum_color.g, sum_color.b};
+
+  sum_color_float[0] = sum_color_float[0] * 0.05 + sum_color_last[0] * 0.95;
+  sum_color_float[1] = sum_color_float[1] * 0.05 + sum_color_last[1] * 0.95;
+  sum_color_float[2] = sum_color_float[2] * 0.05 + sum_color_last[2] * 0.95;
+
+  sum_color_last[0] = sum_color_float[0];
+  sum_color_last[1] = sum_color_float[1];
+  sum_color_last[2] = sum_color_float[2];
+
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
+    leds[i] = CRGB(0, 0, 0);
+    if (i <= led_pos_smooth) {
+      leds[i] = CRGB(
+                  sum_color_float[0],
+                  sum_color_float[1],
+                  sum_color_float[2]
+                );
+    }
+  }
+}
+
+void light_mode_vu_dot() {
+  const float led_share = 255 / float(12);
+  static float sum_color_last[3] = {0, 0, 0};
+  static float led_pos_last = 0;
+
+  float smoothing = (0.1 + CONFIG.MOOD * 0.9) * 0.25;
+  float led_pos = waveform_peak_scaled * (NATIVE_RESOLUTION - 1);
+  static float led_pos_smooth = 0.0;
+
+  led_pos_smooth = led_pos * (smoothing) + led_pos_smooth * (1.0 - smoothing);
+
+  if(led_pos_smooth > 126){
+    led_pos_smooth = 126;
+  }
+
+  CRGB sum_color = CRGB(0, 0, 0);
+  for (uint8_t c = 0; c < 12; c++) {
+    float prog = c / float(12);
+    float bin = note_chromagram[c] * (1.0 / chromagram_max_val);
+
+    CRGB out_col;
+    hsv2rgb_spectrum(
+      CHSV(255 * prog, 255, led_share * bin),
+      out_col);
+
+    sum_color += out_col;
+  }
+
+  CHSV hsv = rgb2hsv_approximate(sum_color);
+  hsv.s = qadd8(hsv.s, 64);
+  hsv.v = qadd8(hsv.v, 64);
+  sum_color = hsv;
+
+  float sum_color_float[3] = {sum_color.r, sum_color.g, sum_color.b};
+
+  sum_color_float[0] = sum_color_float[0] * 0.05 + sum_color_last[0] * 0.95;
+  sum_color_float[1] = sum_color_float[1] * 0.05 + sum_color_last[1] * 0.95;
+  sum_color_float[2] = sum_color_float[2] * 0.05 + sum_color_last[2] * 0.95;
+
+  sum_color_last[0] = sum_color_float[0];
+  sum_color_last[1] = sum_color_float[1];
+  sum_color_last[2] = sum_color_float[2];
+
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
+    leds[i] = CRGB(0, 0, 0);
+  }
+
+  if (led_pos_last < led_pos_smooth) {
+    for (uint8_t i = led_pos_last; i <= led_pos_smooth; i++) {
+      leds[i] = CRGB(
+                  sum_color_float[0],
+                  sum_color_float[1],
+                  sum_color_float[2]
+                );
+      leds[i + 1] = CRGB(
+                      sum_color_float[0],
+                      sum_color_float[1],
+                      sum_color_float[2]
+                    );
+    }
+  }
+  else if (led_pos_last > led_pos_smooth) {
+    for (uint8_t i = led_pos_smooth; i <= led_pos_last; i++) {
+      leds[i] = CRGB(
+                  sum_color_float[0],
+                  sum_color_float[1],
+                  sum_color_float[2]
+                );
+      leds[i + 1] = CRGB(
+                      sum_color_float[0],
+                      sum_color_float[1],
+                      sum_color_float[2]
+                    );
+    }
+  }
+  else {
+    leds[uint8_t(led_pos_smooth)] = CRGB(
+                                      sum_color_float[0],
+                                      sum_color_float[1],
+                                      sum_color_float[2]
+                                    );
+    leds[uint8_t(led_pos_smooth) + 1] = CRGB(
+                                          sum_color_float[0],
+                                          sum_color_float[1],
+                                          sum_color_float[2]
+                                        );
+  }
+
+  led_pos_last = led_pos_smooth;
+}

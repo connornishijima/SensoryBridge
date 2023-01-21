@@ -2,6 +2,11 @@
 #define DEFAULT_SAMPLE_RATE 24400
 #define SAMPLE_HISTORY_LENGTH 2048
 
+// Don't change this unless you're willing to do a lot of other work on the code :/
+#define NATIVE_RESOLUTION 128
+#define NUM_FREQS 64
+#define NUM_ZONES 4
+
 #define I2S_PORT I2S_NUM_0
 
 #define PHOTONS_PIN 1
@@ -28,9 +33,6 @@
 #define SWEET_SPOT_LEFT_CHANNEL    0
 #define SWEET_SPOT_CENTER_CHANNEL  1
 #define SWEET_SPOT_RIGHT_CHANNEL   2
-
-#define NUM_FREQS 64
-#define NUM_ZONES 4
 
 #define TWOPI   6.28318530
 #define FOURPI 12.56637061

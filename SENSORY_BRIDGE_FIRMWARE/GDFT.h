@@ -122,11 +122,13 @@ void IRAM_ATTR process_GDFT() {
     if (noise_iterations >= 256) {
       noise_complete = true;
       Serial.println("DONE");
+      CONFIG.DC_OFFSET = dc_offset_sum / 256.0;
       save_ambient_noise_calibration();
+      save_config();
     }
   }
 
-  // Apply noise data and A-weighting, estimate max values
+  // Apply noise reduction data, estimate max values
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
     if (noise_complete == true) {
       magnitudes[i] -= noise_samples[i] * 1.5;
@@ -269,7 +271,6 @@ void IRAM_ATTR process_GDFT() {
 
   // Make Chromagram
   chromagram_max_val = 0.0;
-  chromagram_bass_max_val = 0.0;
   for (uint8_t i = 0; i < 12; i++) {
     note_chromagram[i] = 0;
     note_chromagram_bass[i] = 0;
@@ -277,7 +278,7 @@ void IRAM_ATTR process_GDFT() {
   for (uint8_t octave = 0; octave < 6; octave++) {
     for (uint8_t note = 0; note < 12; note++) {
       uint16_t note_index = 12 * octave + note;
-      if (note_index < NUM_FREQS) {
+      if (note_index < NUM_FREQS && note_index < CONFIG.CHROMAGRAM_RANGE) {
         note_chromagram[note] += note_spectrogram[note_index]*0.5;
 
         if (note_chromagram[note] > 1.0) {
@@ -286,18 +287,6 @@ void IRAM_ATTR process_GDFT() {
 
         if (note_chromagram[note] > chromagram_max_val) {
           chromagram_max_val = note_chromagram[note];
-        }
-
-        if (note_index < 12) {
-          note_chromagram_bass[note] += note_spectrogram[note_index];
-
-          if (note_chromagram_bass[note] > 1.0) {
-            note_chromagram_bass[note] = 1.0;
-          }
-        
-          if (note_chromagram_bass[note] > chromagram_bass_max_val) {
-            chromagram_bass_max_val = 1.0; //note_chromagram_bass[note];
-          }
         }
       }
     }

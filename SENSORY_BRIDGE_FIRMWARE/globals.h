@@ -9,7 +9,6 @@ struct conf {
   float   BASE_HUE;
   uint8_t LIGHTSHOW_MODE;
   bool    MIRROR_ENABLED;
-  bool    CHROMAGRAM_BASS;
 
   // Private values
   uint32_t SAMPLE_RATE;
@@ -24,8 +23,8 @@ struct conf {
   bool     BOOT_ANIMATION;
   uint16_t SWEET_SPOT_MIN_LEVEL;
   uint16_t SWEET_SPOT_MAX_LEVEL;
-  int32_t  DC_OFFSET; // (TODO)
-  uint32_t WAVEFORM_NOISE_FLOOR; // (TODO)
+  int32_t  DC_OFFSET;
+  uint8_t  CHROMAGRAM_RANGE;
   uint8_t  ESPNOW_CHANNEL; // (TODO)
   bool     IS_MAIN_UNIT;
 
@@ -40,7 +39,6 @@ conf CONFIG = { // Defaults of the CONFIG struct
   0.00, // BASE_HUE
   LIGHT_MODE_GDFT, // LIGHTSHOW_MODE
   true,            // MIRROR_ENABLED (>= 3.0.0 defaults yes)
-  false,           // CHROMAGRAM_BASS
 
   // Private values
   DEFAULT_SAMPLE_RATE, // SAMPLE_RATE
@@ -56,7 +54,7 @@ conf CONFIG = { // Defaults of the CONFIG struct
   750,                 // SWEET_SPOT_MIN_LEVEL
   30000,               // SWEET_SPOT_MAX_LEVEL
   0,                   // DC_OFFSET
-  0,                   // WAVEFORM_NOISE_FLOOR
+  64,                  // CHROMAGRAM_RANGE
   3,                   // ESPNOW_CHANNEL
   false,               // IS_MAIN_UNIT
 
@@ -122,23 +120,29 @@ float smoothing_exp_average = 0.0;
 // ------------------------------------------------------------
 // Audio samples (i2s_audio.h) --------------------------------
 
-int32_t i2s_samples_raw[1024]              = { 0 };
-short sample_window[SAMPLE_HISTORY_LENGTH] = { 0 };
-short waveform[1024]                       = { 0 };
-float max_waveform_val = 0.0;
-float max_waveform_val_follower = 0.0;
-float waveform_peak_scaled = 0.0;
+int32_t i2s_samples_raw[1024]                = { 0 };
+short   sample_window[SAMPLE_HISTORY_LENGTH] = { 0 };
+short   waveform[1024]                       = { 0 };
+short   waveform_history[4][1024]            = { 0 };
+uint8_t waveform_history_index = 0;
+float   max_waveform_val = 0.0;
+float   max_waveform_val_follower = 0.0;
+float   waveform_peak_scaled = 0.0;
+int32_t dc_offset_sum = 0;
+bool    silence = true;
+float   silent_scale = 1.0;
 
 // ------------------------------------------------------------
 // Sweet Spot (i2s_audio.h, led_utilities.h) ------------------
+
 float sweet_spot_state = 0;
 float sweet_spot_state_follower = 0;
 
 // ------------------------------------------------------------
 // Noise calibration (noise_cal.h) ----------------------------
 
-bool noise_complete = true;
-float noise_samples[NUM_FREQS] = { 1 };
+bool     noise_complete = true;
+float    noise_samples[NUM_FREQS] = { 1 };
 uint16_t noise_iterations = 0;
 
 // ------------------------------------------------------------
@@ -162,7 +166,7 @@ float FPS = 0.0;
 // ------------------------------------------------------------
 // SensorySync P2P network (p2p.h) ----------------------------
 
-bool main_override = true;
+bool     main_override = true;
 uint32_t last_rx_time = 0;
 
 // ------------------------------------------------------------
@@ -186,12 +190,12 @@ bool noise_transition_queued = false;
 // Settings tracking (system.h) -------------------------------
 
 uint32_t last_setting_change = 0;
-bool settings_updated = false;
+bool     settings_updated = false;
 
 // ------------------------------------------------------------
 // Serial buffer (serial_menu.h) ------------------------------
 
-char command_buf[128] = {0};
+char    command_buf[128] = {0};
 uint8_t command_buf_index = 0;
 
 bool stream_audio = false;
@@ -200,8 +204,8 @@ bool stream_max_mags = false;
 bool stream_max_mags_followers = false;
 bool stream_magnitudes = false;
 bool stream_spectrogram = false;
-
 bool debug_mode = false;
+
 uint32_t serial_iter = 0;
 
 // ------------------------------------------------------------

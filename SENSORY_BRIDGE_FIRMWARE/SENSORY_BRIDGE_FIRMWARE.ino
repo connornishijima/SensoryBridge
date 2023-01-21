@@ -56,17 +56,14 @@
 
 // Lightshow modes by name -----------------------------------------------------------
 enum lightshow_modes {
-  LIGHT_MODE_GDFT,  // ------------- GDFT - Goertzel-based Discrete Fourier Transform
-  //                                (I made this name up. Saved you a search.)
-
-  // NO OTHER MODES PORTED TO 3.0.0-beta AT THIS TIME
-
-  LIGHT_MODE_GDFT_CHROMAGRAM,  // -- Chromagram of GDFT
-  LIGHT_MODE_BLOOM,            // ------------ Slow Bloom Mode
-  LIGHT_MODE_BLOOM_FAST,       // ------- Fast Bloom Mode (TODO)
-  // LIGHT_MODE_WAVEFORM, // --------- Waveform is shown using LED brightness (TODO)
-  // LIGHT_MODE_VU, // --------------- Not a real VU for any measurement sake, just a dance-y LED bar (TODO)
-  // LIGHT_MODE_VU_DOT, // ----------- Alternate VU display mode - dot with motion blur (TODO)
+  LIGHT_MODE_GDFT, // ------------- GDFT - Goertzel-based Discrete Fourier Transform
+                   //               (I made this name up. Saved you a search.)
+  LIGHT_MODE_GDFT_CHROMAGRAM, // -- Chromagram of GDFT
+  LIGHT_MODE_BLOOM, // ------------ Slow Bloom Mode
+  LIGHT_MODE_BLOOM_FAST, // ------- Fast Bloom Mode
+  LIGHT_MODE_WAVEFORM, // --------- Waveform is shown using LED brightness
+  LIGHT_MODE_VU, // --------------- Not a real VU for any measurement sake, just a dance-y LED bar
+  LIGHT_MODE_VU_DOT, // ----------- Alternate VU display mode - dot with motion blur
 
   NUM_MODES  // used to know the length of this list if it changes in the future
 };
@@ -128,7 +125,7 @@ void loop() {
   // Process P2P network packets to synchronize units
 
   function_id = 5;
-  acquire_sample_chunk();  // (i2s_audio.h)
+  acquire_sample_chunk(t_now);  // (i2s_audio.h)
   // Capture a frame of I2S audio (holy crap, FINALLY something about sound)
 
   function_id = 6;
@@ -177,6 +174,12 @@ void render_leds(uint32_t t_now_us) {
       light_mode_bloom(false);  // (lightshow_modes.h) Bloom mode display
     } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
       light_mode_bloom(true);  // (lightshow_modes.h) Bloom mode display
+    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_WAVEFORM) {
+      light_mode_waveform();  // (lightshow_modes.h) Wavform mode display
+    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
+      light_mode_vu();  // (lightshow_modes.h) VU mode display
+    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
+      light_mode_vu_dot();  // (lightshow_modes.h) VU mode display (dot mode)
     }
 
     if (CONFIG.MIRROR_ENABLED) {  // Mirrored Mode logic
