@@ -101,27 +101,28 @@ void IRAM_ATTR process_GDFT() {
   if (stream_magnitudes == true) {
     if (serial_iter >= 2) {  // Don't print every frame
       serial_iter = 0;
+      Serial.print("sbs((magnitudes=");
       for (uint16_t i = 0; i < NUM_FREQS; i++) {
         Serial.print(uint32_t(magnitudes[i]));
         if (i < NUM_FREQS - 1) {
           Serial.print(',');
         }
       }
-      Serial.println();
+      Serial.println("))");
     }
   }
 
   // Gather noise data
   if (noise_complete == false) {
     for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-      if (magnitudes[i] > noise_samples[i]) {
-        noise_samples[i] = magnitudes[i];
+      if (magnitudes[i]*1.1 > noise_samples[i]) {
+        noise_samples[i] = magnitudes[i]*1.1;
       }
     }
     noise_iterations++;
     if (noise_iterations >= 256) {
       noise_complete = true;
-      Serial.println("DONE");
+      Serial.println("NOISE_CAL_COMPLETE");
       CONFIG.DC_OFFSET = dc_offset_sum / 256.0;
       save_ambient_noise_calibration();
       save_config();
@@ -144,11 +145,14 @@ void IRAM_ATTR process_GDFT() {
   }
 
   if (stream_max_mags == true) {
+    Serial.print("sbs((max_mags=");
     for (uint8_t i = 0; i < NUM_ZONES; i++) {
       Serial.print(max_mags[i]);
-      Serial.print('\t');
+      if (i < NUM_ZONES - 1) {
+        Serial.print(',');
+      }
     }
-    Serial.println(0);
+    Serial.println("))");
   }
 
   // Now let's do some weird math on the MOOD knob.
@@ -240,11 +244,14 @@ void IRAM_ATTR process_GDFT() {
   }
 
   if (stream_max_mags_followers == true) {
+    Serial.print("sbs((max_mags_followers=");
     for (uint8_t i = 0; i < NUM_ZONES; i++) {
       Serial.print(max_mags_followers[i]);
-      Serial.print('\t');
+      if (i < NUM_ZONES - 1) {
+        Serial.print('\t');
+      }
     }
-    Serial.println(0);
+    Serial.println("))");
   }
 
   // Make Spectrogram from raw magnitudes
@@ -279,7 +286,7 @@ void IRAM_ATTR process_GDFT() {
     for (uint8_t note = 0; note < 12; note++) {
       uint16_t note_index = 12 * octave + note;
       if (note_index < NUM_FREQS && note_index < CONFIG.CHROMAGRAM_RANGE) {
-        note_chromagram[note] += note_spectrogram[note_index]*0.5;
+        note_chromagram[note] += note_spectrogram[note_index] * 0.5;
 
         if (note_chromagram[note] > 1.0) {
           note_chromagram[note] = 1.0;
@@ -349,6 +356,7 @@ void lookahead_smoothing() {
   if (stream_spectrogram == true) {
     if (serial_iter >= 2) {  // Don't print every frame
       serial_iter = 0;
+      Serial.print("sbs((spectrogram=");
       for (uint16_t i = 0; i < NUM_FREQS; i++) {
         uint16_t bin = 999 * note_spectrogram_smooth[i];
         Serial.print(bin);
@@ -356,7 +364,7 @@ void lookahead_smoothing() {
           Serial.print(',');
         }
       }
-      Serial.println();
+      Serial.println("))");
     }
   }
 }

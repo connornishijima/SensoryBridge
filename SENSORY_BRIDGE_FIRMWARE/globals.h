@@ -6,7 +6,6 @@ struct conf {
   float   PHOTONS;
   float   CHROMA;
   float   MOOD;
-  float   BASE_HUE;
   uint8_t LIGHTSHOW_MODE;
   bool    MIRROR_ENABLED;
 
@@ -17,26 +16,30 @@ struct conf {
   uint32_t MAGNITUDE_FLOOR;
   uint8_t  LED_TYPE;
   uint16_t LED_COUNT;
+  uint16_t LED_COLOR_ORDER;
+  bool     LED_INTERPOLATION;
   uint16_t MAX_BLOCK_SIZE;
   uint16_t SAMPLES_PER_CHUNK;
   float    GAIN;
   bool     BOOT_ANIMATION;
-  uint16_t SWEET_SPOT_MIN_LEVEL;
-  uint16_t SWEET_SPOT_MAX_LEVEL;
+  uint32_t SWEET_SPOT_MIN_LEVEL;
+  uint32_t SWEET_SPOT_MAX_LEVEL;
   int32_t  DC_OFFSET;
   uint8_t  CHROMAGRAM_RANGE;
-  uint8_t  ESPNOW_CHANNEL; // (TODO)
+  bool     STANDBY_DIMMING;
   bool     IS_MAIN_UNIT;
 
   uint32_t VERSION;
 };
 
-conf CONFIG = { // Defaults of the CONFIG struct  
+// ------------------------------------------------------------
+// Defaults of the CONFIG struct (factory_reset values) -------
+
+conf CONFIG = {
   // Synced values
   1.00, // PHOTONS
   0.00, // CHROMA
   0.05, // MOOD
-  0.00, // BASE_HUE
   LIGHT_MODE_GDFT, // LIGHTSHOW_MODE
   true,            // MIRROR_ENABLED (>= 3.0.0 defaults yes)
 
@@ -47,6 +50,8 @@ conf CONFIG = { // Defaults of the CONFIG struct
   1000,                // MAGNITUDE_FLOOR
   LED_NEOPIXEL,        // LED_TYPE
   128,                 // LED_COUNT
+  GRB,                 // LED_COLOR_ORDER
+  true,                // LED_INTERPOLATION
   1600,                // MAX_BLOCK_SIZE
   256,                 // SAMPLES_PER_CHUNK
   0.0,                 // GAIN
@@ -55,13 +60,15 @@ conf CONFIG = { // Defaults of the CONFIG struct
   30000,               // SWEET_SPOT_MAX_LEVEL
   0,                   // DC_OFFSET
   64,                  // CHROMAGRAM_RANGE
-  3,                   // ESPNOW_CHANNEL
+  true,                // STANDBY_DIMMING
   false,               // IS_MAIN_UNIT
 
   FIRMWARE_VERSION,    // VERSION
 };
 
 conf CONFIG_DEFAULTS; // Used for resetting to default values at runtime
+
+char mode_names[NUM_MODES*32] = { 0 };
 
 // ------------------------------------------------------------
 // Goertzel structure (generated in system.h) -----------------
@@ -117,6 +124,9 @@ float chromagram_bass_max_val = 0.0;
 float smoothing_follower    = 0.0;
 float smoothing_exp_average = 0.0;
 
+float chroma_val = 1.0;
+bool chromatic_mode = true;
+
 // ------------------------------------------------------------
 // Audio samples (i2s_audio.h) --------------------------------
 
@@ -125,11 +135,12 @@ short   sample_window[SAMPLE_HISTORY_LENGTH] = { 0 };
 short   waveform[1024]                       = { 0 };
 short   waveform_history[4][1024]            = { 0 };
 uint8_t waveform_history_index = 0;
+float   max_waveform_val_raw = 0.0;
 float   max_waveform_val = 0.0;
 float   max_waveform_val_follower = 0.0;
 float   waveform_peak_scaled = 0.0;
 int32_t dc_offset_sum = 0;
-bool    silence = true;
+bool    silence = false;
 float   silent_scale = 1.0;
 
 // ------------------------------------------------------------
@@ -137,6 +148,7 @@ float   silent_scale = 1.0;
 
 float sweet_spot_state = 0;
 float sweet_spot_state_follower = 0;
+float sweet_spot_min_temp = 0;
 
 // ------------------------------------------------------------
 // Noise calibration (noise_cal.h) ----------------------------
@@ -153,7 +165,8 @@ CRGB leds_temp[128];
 CRGB leds_last[128];
 CRGB leds_aux [128];
 CRGB leds_fade[128];
-CRGB leds_out[STRIP_LED_COUNT];
+
+CRGB *leds_out;
 
 // ------------------------------------------------------------
 // Benchmarking (system.h) ------------------------------------
@@ -183,8 +196,10 @@ struct button{
 button noise_button;
 button mode_button;
 
-bool mode_transition_queued  = false;
-bool noise_transition_queued = false;
+bool    mode_transition_queued  = false;
+int16_t mode_destination = -1;
+
+bool    noise_transition_queued = false;
 
 // ------------------------------------------------------------
 // Settings tracking (system.h) -------------------------------
@@ -204,7 +219,9 @@ bool stream_max_mags = false;
 bool stream_max_mags_followers = false;
 bool stream_magnitudes = false;
 bool stream_spectrogram = false;
+
 bool debug_mode = false;
+uint32_t chip_id = 0;
 
 uint32_t serial_iter = 0;
 

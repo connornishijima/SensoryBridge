@@ -9,7 +9,13 @@ void light_mode_gdft() {
 
     brightness_levels[i] = led_brightness;  // Can use this value later if needed
 
-    float led_hue = 21.33333333 * i;  // Makes hue completely cycle once per octave
+    float led_hue;
+    if (chromatic_mode == true) {
+      led_hue = 21.33333333 * i;  // Makes hue completely cycle once per octave
+    }
+    else {
+      led_hue = 255 * chroma_val;  // User color selection
+    }
 
     CRGB col1 = CRGB(0, 0, 0);
     hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
@@ -36,7 +42,15 @@ void light_mode_gdft_chromagram() {
       bin = bin * bin;
     }
 
-    leds[i] = CHSV(255 * prog, 255, 255 * bin);
+    float led_hue;
+    if (chromatic_mode == true) {
+      led_hue = 255 * prog;
+    }
+    else {
+      led_hue = 255 * chroma_val;
+    }
+
+    leds[i] = CHSV(led_hue, 255, 255 * bin);
   }
 }
 
@@ -47,27 +61,40 @@ void light_mode_bloom(bool fast_scroll) {
   iter++;
 
   CRGB sum_color = CRGB(0, 0, 0);
+  float brightness_sum = 0.0;
   for (uint8_t i = 0; i < 12; i++) {
     float prog = i / float(12);
 
     float bin = note_chromagram[i]; // * (1.0 / chromagram_max_val);
 
+    float bright = bin;
+    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
+      bright *= bright;
+    }
+    bright *= 1.5;
+    if (bright > 1.0) {
+      bright = 1.0;
+    }
+
+    bright *= led_share;
+
     CRGB out_col;
-    hsv2rgb_spectrum(
-      CHSV(255 * prog, 255, led_share * bin),
-      out_col);
+    if (chromatic_mode == true) {
+      hsv2rgb_spectrum(
+        CHSV(255 * prog, 255, bright),
+        out_col);
+    }
+    else {
+      brightness_sum += bright;
+    }
 
     sum_color += out_col;
   }
 
-  for (uint8_t s = 0; s < CONFIG.SQUARE_ITER - 1; s++) {
-    sum_color.r *= waveform_peak_scaled;
-    sum_color.g *= waveform_peak_scaled;
-    sum_color.b *= waveform_peak_scaled;
-  }
-
-  if (iter % 6 == 1) {
-    //fadeToBlackBy(leds_last, 128, 1);
+  if (chromatic_mode == false) {
+    hsv2rgb_spectrum(
+      CHSV(255 * chroma_val, 255, brightness_sum),
+      sum_color);
   }
 
   if (fast_scroll == true) { // Fast mode scrolls two LEDs at a time
@@ -107,21 +134,46 @@ void light_mode_waveform() {
   waveform_peak_scaled_last = (waveform_peak_scaled * 0.05 + waveform_peak_scaled_last * 0.95);
 
   CRGB sum_color = CRGB(0, 0, 0);
+  float brightness_sum = 0.0;
   for (uint8_t c = 0; c < 12; c++) {
     float prog = c / float(12);
-    float bin = note_chromagram[c]; // * (1.0 / chromagram_max_val);
+    float bin = note_chromagram[c] * (1.0 / chromagram_max_val);
 
-    CRGB out_col;
-    hsv2rgb_spectrum(
-      CHSV(255 * prog, 255, led_share * bin),
-      out_col);
+    float bright = bin;
+    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
+      bright *= bright;
+    }
+    bright *= 1.5;
+    if (bright > 1.0) {
+      bright = 1.0;
+    }
 
-    sum_color += out_col;
+    bright *= led_share;
+
+    if (chromatic_mode == true) {
+      CRGB out_col;
+      hsv2rgb_spectrum(
+        CHSV(255 * prog, 255, bright),
+        out_col);
+
+      sum_color += out_col;
+    }
+    else {
+      brightness_sum += bright;
+    }
   }
 
+  if (chromatic_mode == false) {
+    hsv2rgb_spectrum(
+      CHSV(255 * chroma_val, 255, brightness_sum),
+      sum_color);
+  }
+
+  /*
   CHSV hsv = rgb2hsv_approximate(sum_color);
   hsv.s = qadd8(hsv.s, 64);
   sum_color = hsv;
+  */
 
   float sum_color_float[3] = {sum_color.r, sum_color.g, sum_color.b};
 
@@ -139,33 +191,13 @@ void light_mode_waveform() {
       waveform_sample += waveform_history[s][i];
     }
     waveform_sample /= 4.0;
-    float input_wave_sample = (waveform_sample / 512.0);
+    float input_wave_sample = (waveform_sample / 128.0);
 
     //----------------------
 
     float smoothing = (0.1 + CONFIG.MOOD * 0.9) * 0.05;
 
     waveform_last[i] = input_wave_sample * (smoothing) + waveform_last[i] * (1.0 - smoothing);
-
-    /*
-
-      if(input_wave_sample > waveform_last[i]){
-      float delta = input_wave_sample-waveform_last[i];
-      if(delta > smoothing){
-        input_wave_sample = waveform_last[i] + smoothing;
-      }
-      }
-      else if(input_wave_sample < waveform_last[i]){
-      float delta = waveform_last[i]-input_wave_sample;
-      if(delta > smoothing){
-        input_wave_sample = waveform_last[i] - smoothing;
-      }
-      }
-
-      waveform_last[i] = input_wave_sample;
-    */
-
-    //----------------------
 
     float peak = waveform_peak_scaled_last * 4.0;
     if (peak > 1.0) {
@@ -187,10 +219,6 @@ void light_mode_waveform() {
 
     output_brightness *= peak;
 
-    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
-      output_brightness *= output_brightness;
-    }
-
     leds[i] = CRGB(
                 sum_color_float[0] * output_brightness,
                 sum_color_float[1] * output_brightness,
@@ -209,25 +237,34 @@ void light_mode_vu() {
 
   led_pos_smooth = led_pos * (smoothing) + led_pos_smooth * (1.0 - smoothing);
 
-  if(led_pos_smooth > 126){
+  if (led_pos_smooth > 126) {
     led_pos_smooth = 126;
+  }
+  else if (led_pos_smooth < 0) {
+    led_pos_smooth = 0;
   }
 
   CRGB sum_color = CRGB(0, 0, 0);
-  for (uint8_t c = 0; c < 12; c++) {
-    float prog = c / float(12);
-    float bin = note_chromagram[c] * (1.0 / chromagram_max_val);
+  if (chromatic_mode == true) {
+    for (uint8_t c = 0; c < 12; c++) {
+      float prog = c / float(12);
+      float bin = note_chromagram[c] * (1.0 / chromagram_max_val);
 
-    CRGB out_col;
-    hsv2rgb_spectrum(
-      CHSV(255 * prog, 255, led_share * bin),
-      out_col);
+      CRGB out_col;
+      hsv2rgb_spectrum(
+        CHSV(255 * prog, 255, led_share * bin),
+        out_col);
 
-    sum_color += out_col;
+      sum_color += out_col;
+    }
+  }
+  else {
+    sum_color = CHSV(255 * chroma_val, 255, 255); // User color selection
   }
 
   CHSV hsv = rgb2hsv_approximate(sum_color);
   hsv.s = qadd8(hsv.s, 64);
+  hsv.v = qadd8(hsv.v, 64);
   sum_color = hsv;
 
   float sum_color_float[3] = {sum_color.r, sum_color.g, sum_color.b};
@@ -263,21 +300,29 @@ void light_mode_vu_dot() {
 
   led_pos_smooth = led_pos * (smoothing) + led_pos_smooth * (1.0 - smoothing);
 
-  if(led_pos_smooth > 126){
+  if (led_pos_smooth > 126) {
     led_pos_smooth = 126;
+  }
+  else if (led_pos_smooth < 0) {
+    led_pos_smooth = 0;
   }
 
   CRGB sum_color = CRGB(0, 0, 0);
-  for (uint8_t c = 0; c < 12; c++) {
-    float prog = c / float(12);
-    float bin = note_chromagram[c] * (1.0 / chromagram_max_val);
+  if (chromatic_mode == true) {
+    for (uint8_t c = 0; c < 12; c++) {
+      float prog = c / float(12);
+      float bin = note_chromagram[c] * (1.0 / chromagram_max_val);
 
-    CRGB out_col;
-    hsv2rgb_spectrum(
-      CHSV(255 * prog, 255, led_share * bin),
-      out_col);
+      CRGB out_col;
+      hsv2rgb_spectrum(
+        CHSV(255 * prog, 255, led_share * bin),
+        out_col);
 
-    sum_color += out_col;
+      sum_color += out_col;
+    }
+  }
+  else {
+    sum_color = CHSV(255 * chroma_val, 255, 255); // User color selection
   }
 
   CHSV hsv = rgb2hsv_approximate(sum_color);

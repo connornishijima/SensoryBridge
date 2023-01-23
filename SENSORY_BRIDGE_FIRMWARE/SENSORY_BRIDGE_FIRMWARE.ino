@@ -57,11 +57,11 @@
 // Lightshow modes by name -----------------------------------------------------------
 enum lightshow_modes {
   LIGHT_MODE_GDFT, // ------------- GDFT - Goertzel-based Discrete Fourier Transform
-                   //               (I made this name up. Saved you a search.)
+  //               (I made this name up. Saved you a search.)
   LIGHT_MODE_GDFT_CHROMAGRAM, // -- Chromagram of GDFT
   LIGHT_MODE_BLOOM, // ------------ Slow Bloom Mode
   LIGHT_MODE_BLOOM_FAST, // ------- Fast Bloom Mode
-  LIGHT_MODE_WAVEFORM, // --------- Waveform is shown using LED brightness
+  //LIGHT_MODE_WAVEFORM, // --------- Waveform is shown using LED brightness
   LIGHT_MODE_VU, // --------------- Not a real VU for any measurement sake, just a dance-y LED bar
   LIGHT_MODE_VU_DOT, // ----------- Alternate VU display mode - dot with motion blur
 
@@ -168,17 +168,23 @@ void render_leds(uint32_t t_now_us) {
 
     if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT) {
       light_mode_gdft();  // (lightshow_modes.h) GDFT spectrogram display
-    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {
+    }
+    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {
       light_mode_gdft_chromagram();  // (lightshow_modes.h) GDFT chromagram display
-    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
+    }
+    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
       light_mode_bloom(false);  // (lightshow_modes.h) Bloom mode display
-    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
+    }
+    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
       light_mode_bloom(true);  // (lightshow_modes.h) Bloom mode display
-    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_WAVEFORM) {
-      light_mode_waveform();  // (lightshow_modes.h) Wavform mode display
-    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
+    }
+    //else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_WAVEFORM) {
+      //light_mode_waveform();  // (lightshow_modes.h) Wavform mode display
+    //}
+    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
       light_mode_vu();  // (lightshow_modes.h) VU mode display
-    } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
+    }
+    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
       light_mode_vu_dot();  // (lightshow_modes.h) VU mode display (dot mode)
     }
 

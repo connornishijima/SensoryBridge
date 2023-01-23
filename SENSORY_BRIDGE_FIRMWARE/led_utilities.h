@@ -27,7 +27,7 @@ void run_sweet_spot() {
     float led_level = 1.0 - position_delta;
     led_level *= led_level;
     //                                                Never fully dim
-    led_power[uint8_t(i + 1)] = 4095 * led_level * (0.1+silent_scale*0.9) * sweet_spot_brightness * CONFIG.PHOTONS;
+    led_power[uint8_t(i + 1)] = 4095 * led_level * (0.1 + silent_scale * 0.9) * sweet_spot_brightness * CONFIG.PHOTONS;
   }
 
   ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   led_power[0]);
@@ -38,7 +38,7 @@ void run_sweet_spot() {
 // Returns the linear interpolation of a floating point index in a CRGB array
 // index is in the range of 0.0-1.0
 CRGB lerp_led(float index, CRGB* led_array) {
-  float NUM_LEDS_NATIVE = NATIVE_RESOLUTION-1; // count from zero
+  float NUM_LEDS_NATIVE = NATIVE_RESOLUTION - 1; // count from zero
   float index_f = index * NUM_LEDS_NATIVE;
   if (index_f > NUM_LEDS_NATIVE) {
     return CRGB(0, 0, 0);
@@ -57,12 +57,26 @@ CRGB lerp_led(float index, CRGB* led_array) {
 }
 
 void show_leds() {
-  if (STRIP_LED_COUNT == NATIVE_RESOLUTION) {
+  if (CONFIG.LED_COUNT == NATIVE_RESOLUTION) {
     memcpy(leds_out, leds, sizeof(leds));
-  } else {  // If not native resolution, use interpolation
-    for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
-      float progress = i / float(STRIP_LED_COUNT - 1);
-      leds_out[i] = lerp_led(progress, leds);
+  } else {  // If not native resolution, use interpolation if enabled
+    if (CONFIG.LED_INTERPOLATION == true) {
+      float index_push = float(1) / float(CONFIG.LED_COUNT);
+      float index = 0.0;
+
+      for (uint16_t i = 0; i < CONFIG.LED_COUNT; i++) { // Interpolation
+        leds_out[i] = lerp_led(index, leds);
+        index += index_push;
+      }
+    }
+    else { // No interpolation
+      float index_push = float(NATIVE_RESOLUTION) / float(CONFIG.LED_COUNT);
+      float index = 0.0;
+
+      for (uint16_t i = 0; i < CONFIG.LED_COUNT; i++) {
+        leds_out[i] = leds[uint8_t(index)];
+        index += index_push;
+      }
     }
   }
   // PHOTONS knob is squared and applied here:
@@ -72,10 +86,31 @@ void show_leds() {
 
 void init_leds() {
   bool leds_started = false;
+
+  leds_out = new CRGB[CONFIG.LED_COUNT];
+
   if (CONFIG.LED_TYPE == LED_NEOPIXEL) {
-    FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds_out, CONFIG.LED_COUNT);  // GRB ordering is assumed
-  } else if (CONFIG.LED_TYPE == LED_DOTSTAR) {
-    FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, BGR>(leds_out, CONFIG.LED_COUNT);
+    if(CONFIG.LED_COLOR_ORDER == RGB){
+      FastLED.addLeds<WS2812B, LED_DATA_PIN, RGB>(leds_out, CONFIG.LED_COUNT);
+    }
+    else if(CONFIG.LED_COLOR_ORDER == GRB){
+      FastLED.addLeds<WS2812B, LED_DATA_PIN, GRB>(leds_out, CONFIG.LED_COUNT);
+    }
+    else if(CONFIG.LED_COLOR_ORDER == BGR){
+      FastLED.addLeds<WS2812B, LED_DATA_PIN, BGR>(leds_out, CONFIG.LED_COUNT);
+    }
+  }
+  
+  else if (CONFIG.LED_TYPE == LED_DOTSTAR) {
+    if(CONFIG.LED_COLOR_ORDER == RGB){
+      FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, CONFIG.LED_COUNT);
+    }
+    else if(CONFIG.LED_COLOR_ORDER == GRB){
+      FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, GRB>(leds_out, CONFIG.LED_COUNT);
+    }
+    else if(CONFIG.LED_COLOR_ORDER == BGR){
+      FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, BGR>(leds_out, CONFIG.LED_COUNT);
+    }
   }
 
   FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
@@ -140,13 +175,13 @@ void clear_all_led_buffers() {
     leds_fade[i] = CRGB(0, 0, 0);
   }
 
-  for (uint16_t i = 0; i < STRIP_LED_COUNT; i++) {
+  for (uint16_t i = 0; i < CONFIG.LED_COUNT; i++) {
     leds_out[i] = CRGB(0, 0, 0);
   }
 }
 
 void scale_image_to_half() {
-  for (uint16_t i = 0; i < (NATIVE_RESOLUTION>>1); i++) {
+  for (uint16_t i = 0; i < (NATIVE_RESOLUTION >> 1); i++) {
     leds[i] = leds[i << 1];
   }
 }
@@ -164,15 +199,15 @@ void shift_leds_down(uint16_t offset) {
 }
 
 void mirror_image_upwards() {
-  for (uint8_t i = 0; i < (NATIVE_RESOLUTION>>1); i++) {
+  for (uint8_t i = 0; i < (NATIVE_RESOLUTION >> 1); i++) {
     leds_temp[i] = leds[i];
-    leds_temp[(NATIVE_RESOLUTION-1) - i] = leds[i];
+    leds_temp[(NATIVE_RESOLUTION - 1) - i] = leds[i];
   }
   load_leds_from_temp();
 }
 
 void mirror_image_downwards() {
-  for (uint8_t i = 0; i < (NATIVE_RESOLUTION>>1); i++) {
+  for (uint8_t i = 0; i < (NATIVE_RESOLUTION >> 1); i++) {
     leds_temp[64 + i] = leds[64 + i];
     leds_temp[63 - i] = leds[64 + i];
   }
@@ -293,15 +328,23 @@ void run_transition_fade() {
   else {
     if (mode_transition_queued == true) { // If transition for MODE button press
       mode_transition_queued = false;
-      CONFIG.LIGHTSHOW_MODE++;
-      if (CONFIG.LIGHTSHOW_MODE >= NUM_MODES) {
-        CONFIG.LIGHTSHOW_MODE = 0;
+      if (mode_destination == -1) { // Triggered via button
+        CONFIG.LIGHTSHOW_MODE++;
+        if (CONFIG.LIGHTSHOW_MODE >= NUM_MODES) {
+          CONFIG.LIGHTSHOW_MODE = 0;
+        }
+      }
+      else { // Triggered via Serial
+        CONFIG.LIGHTSHOW_MODE = mode_destination;
+        mode_destination = -1;
       }
     }
     if (noise_transition_queued == true) { // If transition for NOISE button press
       noise_transition_queued = false;
       // start noise cal
-      Serial.println("COLLECTING AMBIENT NOISE SAMPLES...");
+      if (debug_mode) {
+        Serial.println("COLLECTING AMBIENT NOISE SAMPLES...");
+      }
       propagate_noise_cal();
       start_noise_cal();
     }
@@ -310,7 +353,7 @@ void run_transition_fade() {
 
 void distort_exponential() {
   for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
-    float prog = i / float(NATIVE_RESOLUTION-1);
+    float prog = i / float(NATIVE_RESOLUTION - 1);
     float prog_distorted = prog * prog;
     leds_temp[i] = lerp_led(prog_distorted, leds);
   }
@@ -319,7 +362,7 @@ void distort_exponential() {
 
 void distort_logarithmic() {
   for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
-    float prog = i / float(NATIVE_RESOLUTION-1);
+    float prog = i / float(NATIVE_RESOLUTION - 1);
     float prog_distorted = sqrt(prog);
     leds_temp[i] = lerp_led(prog_distorted, leds);
   }
@@ -339,8 +382,8 @@ void fade_top_half(bool shifted = false) {
   if (shifted == true) {
     shift -= 64;
   }
-  for (uint8_t i = 0; i < (NATIVE_RESOLUTION>>1); i++) {
-    float fade = i / float(NATIVE_RESOLUTION>>1);
+  for (uint8_t i = 0; i < (NATIVE_RESOLUTION >> 1); i++) {
+    float fade = i / float(NATIVE_RESOLUTION >> 1);
 
     leds[(NATIVE_RESOLUTION - 1 - i) + shift].r *= fade;
     leds[(NATIVE_RESOLUTION - 1 - i) + shift].g *= fade;

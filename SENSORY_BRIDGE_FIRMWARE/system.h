@@ -16,6 +16,10 @@ void end_timing() {
   Serial.println(" MS");
 }
 
+void check_current_function() {
+  function_hits[function_id]++;
+}
+
 void init_sweet_spot(){
   ledcSetup(SWEET_SPOT_LEFT_CHANNEL, 500, 12);
   ledcAttachPin(SWEET_SPOT_LEFT_PIN, SWEET_SPOT_LEFT_CHANNEL);
@@ -119,6 +123,13 @@ void debug_function_timing(uint32_t t_now){
   }
 }
 
+void set_mode_name(uint16_t index, char* mode_name){
+  uint8_t len = strlen(mode_name);
+  for(uint8_t i = 0; i < len; i++){
+    mode_names[32*index + i] = mode_name[i];
+  }
+}
+
 void init_system() {
   noise_button.pin = NOISE_CAL_PIN;
   mode_button.pin = MODE_PIN;
@@ -129,9 +140,26 @@ void init_system() {
 
   memcpy(&CONFIG_DEFAULTS, &CONFIG, sizeof(CONFIG)); // Copy defaults values to second CONFIG object
 
+  set_mode_name(0, "GDFT");
+  set_mode_name(1, "CHROMAGRAM");
+  set_mode_name(2, "BLOOM");
+  set_mode_name(3, "BLOOM (FAST)");
+  set_mode_name(4, "WAVEFORM");
+  set_mode_name(5, "VU");
+  set_mode_name(6, "VU (DOT)");
+
+  uint64_t mac_address = ESP.getEfuseMac();
+  uint64_t mac_address_trunc = mac_address << 40;
+  chip_id = mac_address_trunc >> 40;
+
   init_serial(SERIAL_BAUD);
   init_sweet_spot();
   init_fs();
+
+  if (digitalRead(noise_button.pin) == LOW && digitalRead(mode_button.pin) == LOW){
+    restore_defaults();
+  }
+  
   init_leds();
   init_i2s();
   init_p2p();
@@ -169,7 +197,9 @@ void log_fps(uint32_t t_now_us) {
   FPS = fps_sum / 10.0;
 
   if(stream_fps == true){
-    Serial.println(FPS);
+    Serial.print("sbs((fps=");
+    Serial.print(FPS);
+    Serial.println("))");
   }
 
   t_last = t_now_us;

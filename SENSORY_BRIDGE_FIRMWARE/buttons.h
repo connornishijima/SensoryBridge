@@ -61,8 +61,7 @@ void check_buttons(uint32_t t_now) {
     if (t_now - mode_button.last_down > 250 && mode_button.last_up < mode_button.last_down) {
       if (CONFIG.IS_MAIN_UNIT || main_override) {
         CONFIG.MIRROR_ENABLED = !CONFIG.MIRROR_ENABLED;
-        last_setting_change = millis();
-        settings_updated = true;
+        save_config_delayed();
       } else {
         identify_main_unit();
       }
@@ -78,7 +77,7 @@ void check_buttons(uint32_t t_now) {
         skip_click = true;
         mode_transition_queued = false;
         MASTER_BRIGHTNESS = 1.0;
-        Serial.println("DOUBLE CLICK");
+        if(debug_mode){Serial.println("DOUBLE CLICK");}
       }
 
       uint32_t press_duration = mode_button.last_up - mode_button.last_down;
@@ -87,9 +86,9 @@ void check_buttons(uint32_t t_now) {
         if (mode_transition_queued == false) {
           if (CONFIG.IS_MAIN_UNIT || main_override) {
             mode_transition_queued = true; // See run_transition_fade() in led_utilities.h
+            mode_destination = -1;
 
-            last_setting_change = millis();
-            settings_updated = true;
+            save_config_delayed();
           } else {
             identify_main_unit();
           }

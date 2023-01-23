@@ -1,6 +1,6 @@
 /*----------------------------------------
   Sensory Bridge P2P NETWORK FUNCTIONS
-----------------------------------------*/
+  ----------------------------------------*/
 
 // Fully documenting the P2P functions is a TODO for now.
 // Sorry!
@@ -21,10 +21,9 @@ enum COMMAND_TYPES {
 struct SB_COMMAND_SYNC_SETTINGS {
   char ident[4] = { 'S', 'B', 'C', 0 };
   uint8_t command_type = COMMAND_SYNC_SETTINGS;
-  float PHOTONS_KNOB;
-  float CHROMA_KNOB;
-  float MOOD_KNOB;
-  float BASE_HUE;
+  float   PHOTONS_KNOB;
+  float   CHROMA_KNOB;
+  float   MOOD_KNOB;
   uint8_t LIGHTSHOW_MODE;
   uint8_t MIRROR_ENABLED;
   uint8_t CHROMAGRAM_RANGE;
@@ -45,8 +44,6 @@ struct SB_COMMAND_IDENTIFY_MAIN {
   uint8_t command_type = COMMAND_IDENTIFY_MAIN;
 };
 
-uint8_t ESPNOW_CHANNEL = 0;
-
 void print_mac(const uint8_t *mac_addr) {
   Serial.print(mac_addr[0], HEX);
   Serial.print(':');
@@ -63,11 +60,10 @@ void print_mac(const uint8_t *mac_addr) {
 
 void sync_settings(uint32_t t_now) {
   SB_COMMAND_SYNC_SETTINGS setting;
-  
+
   setting.PHOTONS_KNOB = CONFIG.PHOTONS;
   setting.CHROMA_KNOB = CONFIG.CHROMA;
   setting.MOOD_KNOB = CONFIG.MOOD;
-  setting.BASE_HUE = CONFIG.BASE_HUE;
   setting.LIGHTSHOW_MODE = CONFIG.LIGHTSHOW_MODE;
   setting.MIRROR_ENABLED = CONFIG.MIRROR_ENABLED;
   setting.CHROMAGRAM_RANGE = CONFIG.CHROMAGRAM_RANGE;
@@ -122,13 +118,13 @@ void on_data_rx(const uint8_t *mac_addr, const uint8_t *incoming_data, int len) 
   if (strcmp(data_type, "SBC") == 0) {
     uint8_t command_type = incoming_data[4];
 
-#if DEBUG_MODE == 1
-    Serial.print("RX COMMAND OF TYPE ");
-    Serial.print(command_type);
-    Serial.print(" FROM ");
-    print_mac(mac_addr);
-    Serial.println();
-#endif
+    if (debug_mode) {
+      Serial.print("RX COMMAND OF TYPE ");
+      Serial.print(command_type);
+      Serial.print(" FROM ");
+      print_mac(mac_addr);
+      Serial.println();
+    }
 
     if (command_type == COMMAND_SYNC_SETTINGS) {
       if (CONFIG.IS_MAIN_UNIT == false) {
@@ -138,7 +134,6 @@ void on_data_rx(const uint8_t *mac_addr, const uint8_t *incoming_data, int len) 
         CONFIG.PHOTONS = settings.PHOTONS_KNOB;
         CONFIG.CHROMA = settings.CHROMA_KNOB;
         CONFIG.MOOD = settings.MOOD_KNOB;
-        CONFIG.BASE_HUE = settings.BASE_HUE;
         CONFIG.LIGHTSHOW_MODE = settings.LIGHTSHOW_MODE;
         CONFIG.MIRROR_ENABLED = settings.MIRROR_ENABLED;
         CONFIG.CHROMAGRAM_RANGE = settings.CHROMAGRAM_RANGE;
@@ -162,9 +157,11 @@ void on_data_rx(const uint8_t *mac_addr, const uint8_t *incoming_data, int len) 
       }
     }
   }
-  else{
-    Serial.print("UNKNOWN PACKET:");
-    Serial.println(data_type);
+  else {
+    if (debug_mode) {
+      Serial.print("UNKNOWN PACKET:");
+      Serial.println(data_type);
+    }
   }
 }
 
@@ -179,7 +176,7 @@ void init_p2p() {
 
   memset(&broadcast_peer, 0, sizeof(broadcast_peer));
   memcpy(broadcast_peer.peer_addr, broadcast_address, 6);
-  broadcast_peer.channel = 0;
+  broadcast_peer.channel = 0; // TODO - avoid broadcast mode to allow for other WIFI channels (Promiscuous only works on channel 0)
   broadcast_peer.encrypt = false;
 
   Serial.print("ESP-NOW ADD BROADCAST PEER: ");

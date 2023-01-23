@@ -84,6 +84,16 @@ void check_knobs(uint32_t t_now) {
     }
   }
 
+  // CHROMA Knob handling
+  chroma_val = 1.0;
+  if(CONFIG.CHROMA < 0.9){
+    chroma_val = CONFIG.CHROMA*1.1111111; // Reciprocal of 0.9 above
+    chromatic_mode = false;
+  }
+  else{
+    chromatic_mode = true;
+  }
+
   // This is only used to fade in when booting!
   if(t_now >= 1000 && noise_transition_queued == false && mode_transition_queued == false){
     if(MASTER_BRIGHTNESS < 1.0){

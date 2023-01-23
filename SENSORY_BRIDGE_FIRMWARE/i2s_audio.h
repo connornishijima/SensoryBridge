@@ -54,17 +54,18 @@ void init_i2s() {
 
 void acquire_sample_chunk(uint32_t t_now) {
   static int8_t   sweet_spot_state_last = 0;
-  static bool     silence_temp = true;
+  static bool     silence_temp = false;
   static uint32_t silence_switched = 0;
   static float    silent_scale_last = 1.0;
   static uint32_t iter = 0;
-  
+
   size_t bytes_read = 0;
   i2s_read(I2S_PORT, i2s_samples_raw, CONFIG.SAMPLES_PER_CHUNK * sizeof(int32_t), &bytes_read, portMAX_DELAY);
 
   max_waveform_val = 0.0;
+  max_waveform_val_raw = 0.0;
   waveform_history_index++;
-  if(waveform_history_index >= 4){
+  if (waveform_history_index >= 4) {
     waveform_history_index = 0;
   }
 
@@ -83,90 +84,115 @@ void acquire_sample_chunk(uint32_t t_now) {
     waveform[i] = sample - CONFIG.DC_OFFSET;
     waveform_history[waveform_history_index][i] = waveform[i];
 
-    int16_t sample_abs = abs(sample) - (CONFIG.SWEET_SPOT_MIN_LEVEL >> 1);
-    if (sample_abs > max_waveform_val) {
-      max_waveform_val = sample_abs;
-    }
-
-    if (stream_audio == true) {
-      Serial.println(sample);
+    int16_t sample_abs = abs(sample);
+    if (sample_abs > max_waveform_val_raw) {
+      max_waveform_val_raw = sample_abs;
     }
   }
-  
+
+  if (stream_audio == true) {
+    Serial.print("sbs((audio=");
+    for (uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++) {
+      Serial.print(waveform[i]);
+      if (i < CONFIG.SAMPLES_PER_CHUNK - 1) {
+        Serial.print(',');
+      }
+    }
+    Serial.println("))");
+  }
+
   if (noise_complete == false) {
     dc_offset_sum += waveform[0];
-  }
 
-  if (max_waveform_val > max_waveform_val_follower) {
-    float delta = max_waveform_val - max_waveform_val_follower;
-    max_waveform_val_follower += delta * 0.25;
-  }
-  else if (max_waveform_val < max_waveform_val_follower) {
-    float delta = max_waveform_val_follower - max_waveform_val;
-    max_waveform_val_follower -= delta * 0.0025;
+    silent_scale = 1.0; // Force LEDs on during calibration
 
-    if (max_waveform_val_follower < CONFIG.SWEET_SPOT_MIN_LEVEL) {
-      max_waveform_val_follower = CONFIG.SWEET_SPOT_MIN_LEVEL;
-    }
-  }
-  float waveform_peak_scaled_raw = max_waveform_val / max_waveform_val_follower;
-
-  if (waveform_peak_scaled_raw > waveform_peak_scaled) {
-    float delta = waveform_peak_scaled_raw - waveform_peak_scaled;
-    waveform_peak_scaled += delta * 0.25;
-  }
-  else if (waveform_peak_scaled_raw < waveform_peak_scaled) {
-    float delta = waveform_peak_scaled - waveform_peak_scaled_raw;
-    waveform_peak_scaled -= delta * 0.25;
-  }
-
-  // Use the maximum amplitude of the captured frame to set
-  // the Sweet Spot state. Think of this like a coordinate
-  // space where 0 is the center LED, -1 is the left, and
-  // +1 is the right. See run_sweet_spot() in led_utilities.h
-  // for how this value translates to the final LED brightnesses
-  if (max_waveform_val <= CONFIG.SWEET_SPOT_MIN_LEVEL) {
-    sweet_spot_state = -1;
-    if(sweet_spot_state_last != -1){ // Just became silent
-      silence_temp = true;
-      silence_switched = t_now;
-    }
-  }
-  else if (max_waveform_val >= CONFIG.SWEET_SPOT_MAX_LEVEL) {
-    sweet_spot_state = 1;
-    if(sweet_spot_state_last != 1){ // No longer silent
-      silence_temp = false;
-      silence_switched = t_now;
+    if (noise_iterations >= 64 && noise_iterations <= 192) { // sample in the middle of noise cal
+      if (max_waveform_val_raw*1.10 > CONFIG.SWEET_SPOT_MIN_LEVEL) { // Sweet Spot Min threshold should be the silence level + 15%
+        CONFIG.SWEET_SPOT_MIN_LEVEL = max_waveform_val_raw*1.10;
+      }
     }
   }
   else {
-    sweet_spot_state = 0;
-    if(sweet_spot_state_last != 0){ // No longer silent
-      silence_temp = false;
-      silence_switched = t_now;
+    max_waveform_val = max_waveform_val_raw - (CONFIG.SWEET_SPOT_MIN_LEVEL);
+    
+    if (max_waveform_val > max_waveform_val_follower) {
+      float delta = max_waveform_val - max_waveform_val_follower;
+      max_waveform_val_follower += delta * 0.25;
     }
-  }
+    else if (max_waveform_val < max_waveform_val_follower) {
+      float delta = max_waveform_val_follower - max_waveform_val;
+      max_waveform_val_follower -= delta * 0.0025;
 
-  if(silence_temp == true){
-    if(t_now - silence_switched >= 10000){
-      silence = true;
+      if (max_waveform_val_follower < CONFIG.SWEET_SPOT_MIN_LEVEL) {
+        max_waveform_val_follower = CONFIG.SWEET_SPOT_MIN_LEVEL;
+      }
     }
-  }
-  else{
-    silence = false;
-  }
+    float waveform_peak_scaled_raw = max_waveform_val / max_waveform_val_follower;
 
-  // Make silent_scale more slowly track instant change in reality
-  float silent_scale_raw = 1.0 - silence; // Turn off when quiet
-  silent_scale = silent_scale_raw * 0.1 + silent_scale_last * 0.9; 
-  silent_scale_last = silent_scale;
+    if (waveform_peak_scaled_raw > waveform_peak_scaled) {
+      float delta = waveform_peak_scaled_raw - waveform_peak_scaled;
+      waveform_peak_scaled += delta * 0.25;
+    }
+    else if (waveform_peak_scaled_raw < waveform_peak_scaled) {
+      float delta = waveform_peak_scaled - waveform_peak_scaled_raw;
+      waveform_peak_scaled -= delta * 0.25;
+    }
 
-  for (int i = 0; i < SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK; i++) {
-    sample_window[i] = sample_window[i + CONFIG.SAMPLES_PER_CHUNK];
-  }
-  for (int i = SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK; i < SAMPLE_HISTORY_LENGTH; i++) {
-    sample_window[i] = waveform[i - (SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK)];
-  }
+    // Use the maximum amplitude of the captured frame to set
+    // the Sweet Spot state. Think of this like a coordinate
+    // space where 0 is the center LED, -1 is the left, and
+    // +1 is the right. See run_sweet_spot() in led_utilities.h
+    // for how this value translates to the final LED brightnesses
 
-  sweet_spot_state_last = sweet_spot_state;
+    if (max_waveform_val_raw <= CONFIG.SWEET_SPOT_MIN_LEVEL * 0.95) {
+      sweet_spot_state = -1;
+      if (sweet_spot_state_last != -1) { // Just became silent
+        silence_temp = true;
+        silence_switched = t_now;
+      }
+    }
+    else if (max_waveform_val_raw >= CONFIG.SWEET_SPOT_MAX_LEVEL) {
+      sweet_spot_state = 1;
+      if (sweet_spot_state_last != 1) { // No longer silent
+        silence_temp = false;
+        silence_switched = t_now;
+      }
+    }
+    else {
+      sweet_spot_state = 0;
+      if (sweet_spot_state_last != 0) { // No longer silent
+        silence_temp = false;
+        silence_switched = t_now;
+      }
+    }
+
+    if (silence_temp == true) {
+      if (t_now - silence_switched >= 10000) {
+        silence = true;
+      }
+    }
+    else {
+      silence = false;
+    }
+
+
+    if (CONFIG.STANDBY_DIMMING == true) {
+      // Make silent_scale more slowly track instant change in reality
+      float silent_scale_raw = 1.0 - silence; // Turn off when quiet
+      silent_scale = silent_scale_raw * 0.1 + silent_scale_last * 0.9;
+      silent_scale_last = silent_scale;
+    }
+    else {
+      silent_scale = 1.0;
+    }
+
+    for (int i = 0; i < SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK; i++) {
+      sample_window[i] = sample_window[i + CONFIG.SAMPLES_PER_CHUNK];
+    }
+    for (int i = SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK; i < SAMPLE_HISTORY_LENGTH; i++) {
+      sample_window[i] = waveform[i - (SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK)];
+    }
+
+    sweet_spot_state_last = sweet_spot_state;
+  }
 }
