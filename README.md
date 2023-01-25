@@ -29,7 +29,7 @@ It has to be seen to be believed, *which the video demos below can help with:*
 
 # SENSORY BRIDGE is **SIMPLE**
 
-**Easy controls provide quick access to changing the brightness, audio gain, and smoothing of the display!**
+**Easy controls provide quick access to changing the brightness, color, and smoothing of the display!**
 
 # **KNOBS**
 
