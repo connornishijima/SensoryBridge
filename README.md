@@ -174,5 +174,3 @@ The **[GETTING STARTED](https://sensorybridge.rocks/tutorial/) GUIDE** will walk
 # **CREDITS**
 
 Developed by Connor Nishijima for Lixie Labs (2022)
-
-**The underlying FFT code was written by [Robin Scheibler](http://www.robinscheibler.org)!**
