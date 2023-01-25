@@ -1,9 +1,25 @@
 uint32_t timing_start = 0;
+extern void run_sweet_spot();
+extern void show_leds();
+
+void reboot() {
+  USBSerial.println("--- ! REBOOTING to apply changes (You may need to restart the Serial Monitor)");
+  USBSerial.flush();
+  for(float i = 1.0; i >= 0.0; i-=0.05){
+    MASTER_BRIGHTNESS = i;
+    run_sweet_spot();
+    show_leds();
+    delay(12); // Takes ~250ms total
+  }
+  FastLED.setBrightness(0);
+  FastLED.show();
+  ESP.restart();
+}
 
 void start_timing(char* func_name) {
-  Serial.print(func_name);
-  Serial.print(": ");
-  Serial.flush();
+  USBSerial.print(func_name);
+  USBSerial.print(": ");
+  USBSerial.flush();
   timing_start = micros();
 }
 
@@ -11,16 +27,126 @@ void end_timing() {
   uint32_t timing_end = micros();
   uint32_t t_delta = timing_end - timing_start;
 
-  Serial.print("DONE IN ");
-  Serial.print(t_delta / 1000.0, 3);
-  Serial.println(" MS");
+  USBSerial.print("DONE IN ");
+  USBSerial.print(t_delta / 1000.0, 3);
+  USBSerial.println(" MS");
 }
 
 void check_current_function() {
   function_hits[function_id]++;
 }
 
-void init_sweet_spot(){
+static void usb_event_callback(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+  if (event_base == ARDUINO_USB_EVENTS) {
+    //arduino_usb_event_data_t * data = (arduino_usb_event_data_t*)event_data;
+    switch (event_id) {
+      case ARDUINO_USB_STARTED_EVENT:
+        //Serial0.println("USB PLUGGED");
+        break;
+      case ARDUINO_USB_STOPPED_EVENT:
+        //Serial0.println("USB UNPLUGGED");
+        break;
+      case ARDUINO_USB_SUSPEND_EVENT:
+        //Serial0.printf("USB SUSPENDED: remote_wakeup_en: %u\n", data->suspend.remote_wakeup_en);
+        break;
+      case ARDUINO_USB_RESUME_EVENT:
+        //Serial0.println("USB RESUMED");
+        break;
+
+      default:
+        break;
+    }
+  } else if (event_base == ARDUINO_FIRMWARE_MSC_EVENTS) {
+    //arduino_firmware_msc_event_data_t * data = (arduino_firmware_msc_event_data_t*)event_data;
+    switch (event_id) {
+      case ARDUINO_FIRMWARE_MSC_START_EVENT:
+        //Serial0.println("MSC Update Start");
+        msc_update_started = true;
+        break;
+      case ARDUINO_FIRMWARE_MSC_WRITE_EVENT:
+        //HWSerial.printf("MSC Update Write %u bytes at offset %u\n", data->write.size, data->write.offset);
+        //Serial0.print(".");
+        break;
+      case ARDUINO_FIRMWARE_MSC_END_EVENT:
+        //Serial0.printf("\nMSC Update End: %u bytes\n", data->end.size);
+        break;
+      case ARDUINO_FIRMWARE_MSC_ERROR_EVENT:
+        //Serial0.printf("MSC Update ERROR! Progress: %u bytes\n", data->error.size);
+        break;
+      case ARDUINO_FIRMWARE_MSC_POWER_EVENT:
+        //Serial0.printf("MSC Update Power: power: %u, start: %u, eject: %u", data->power.power_condition, data->power.start, data->power.load_eject);
+        break;
+
+      default:
+        break;
+    }
+  }
+}
+
+void enable_usb_update_mode() {
+  USB.onEvent(usb_event_callback);
+
+  MSC_Update.onEvent(usb_event_callback);
+  MSC_Update.begin();
+
+  MASTER_BRIGHTNESS = 1.0;
+
+  uint8_t led_index = 0;
+  uint8_t sweet_index = 0;
+
+  const uint8_t sweet_order[3][3] = {
+    {1, 0, 0},
+    {0, 1, 0},
+    {0, 0, 1}
+  };
+
+  while (true) {
+    for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
+      leds[i] = CRGB(0, 0, 0);
+    }
+
+    if (msc_update_started == false) {
+      leds[led_index] = CRGB(0, 0, 32);
+      ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   sweet_order[sweet_index][0] * 512);
+      ledcWrite(SWEET_SPOT_CENTER_CHANNEL, sweet_order[sweet_index][1] * 512);
+      ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  sweet_order[sweet_index][2] * 512);
+    }
+    else {
+      leds[NATIVE_RESOLUTION-1-led_index] = CRGB(0, 32, 0);
+      ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   sweet_order[sweet_index][2] * 4095);
+      ledcWrite(SWEET_SPOT_CENTER_CHANNEL, sweet_order[sweet_index][1] * 4095);
+      ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  sweet_order[sweet_index][0] * 4095);
+    }
+
+
+    show_leds();
+
+    if(led_index == 0 || led_index == NATIVE_RESOLUTION/2){
+      sweet_index++;
+      if (sweet_index >= 3) {
+        sweet_index = 0;
+      }
+    }
+
+    led_index++;
+    if (led_index >= NATIVE_RESOLUTION) {
+      led_index = 0;      
+    }
+    yield();
+  }
+}
+
+void init_usb() {
+  USB.productName("Sensory Bridge");  // Doesn't work, not my fault
+  USB.manufacturerName("Lixie Labs"); // Doesn't work, not my fault
+  USB.VID(0x1209); // This works though, god damn I hate USB
+  USB.PID(0xABED); // Cool, cool cool cool https://pid.codes/1209/ABED/
+
+  USB.begin();
+  USBSerial.begin();
+}
+
+void init_sweet_spot() {
   ledcSetup(SWEET_SPOT_LEFT_CHANNEL, 500, 12);
   ledcAttachPin(SWEET_SPOT_LEFT_PIN, SWEET_SPOT_LEFT_CHANNEL);
 
@@ -84,19 +210,19 @@ void generate_frequency_data() {
   for (uint8_t i = 0; i < NUM_FREQS; i++) {
     float prog = i / float(NUM_FREQS);
 
-    uint16_t note_index = i+CONFIG.NOTE_OFFSET;
+    uint16_t note_index = i + CONFIG.NOTE_OFFSET;
     uint16_t max_index = sizeof(notes) / sizeof(float);
 
-    if(note_index > max_index-1){
-      note_index = max_index-1;
+    if (note_index > max_index - 1) {
+      note_index = max_index - 1;
     }
 
     frequencies[i].target_freq = notes[note_index];
-    frequencies[i].block_size  = (CONFIG.MAX_BLOCK_SIZE) - ((CONFIG.MAX_BLOCK_SIZE*0.95) * sqrt(sqrt(prog)));
+    frequencies[i].block_size  = (CONFIG.MAX_BLOCK_SIZE) - ((CONFIG.MAX_BLOCK_SIZE * 0.95) * sqrt(sqrt(prog)));
     frequencies[i].block_size_recip = 1.0 / float(frequencies[i].block_size);
 
     frequencies[i].zone = (i / float(NUM_FREQS)) * NUM_ZONES;
-    
+
     float w = 2.0 * PI * ((float)frequencies[i].target_freq / CONFIG.SAMPLE_RATE);
     float coeff = 2.0 * cos(w);
     frequencies[i].coeff_q14 = (1 << 14) * coeff;
@@ -106,15 +232,15 @@ void generate_frequency_data() {
   end_timing();
 }
 
-void debug_function_timing(uint32_t t_now){
+void debug_function_timing(uint32_t t_now) {
   static uint32_t last_timing_print = t_now;
 
-  if(t_now - last_timing_print >= 30000){
-    Serial.println("------------");
-    for(uint8_t i = 0; i < 16; i++){
-      Serial.print(i);
-      Serial.print(": ");
-      Serial.println(function_hits[i]);
+  if (t_now - last_timing_print >= 30000) {
+    USBSerial.println("------------");
+    for (uint8_t i = 0; i < 16; i++) {
+      USBSerial.print(i);
+      USBSerial.print(": ");
+      USBSerial.println(function_hits[i]);
 
       function_hits[i] = 0;
     }
@@ -123,10 +249,10 @@ void debug_function_timing(uint32_t t_now){
   }
 }
 
-void set_mode_name(uint16_t index, char* mode_name){
+void set_mode_name(uint16_t index, char* mode_name) {
   uint8_t len = strlen(mode_name);
-  for(uint8_t i = 0; i < len; i++){
-    mode_names[32*index + i] = mode_name[i];
+  for (uint8_t i = 0; i < len; i++) {
+    mode_names[32 * index + i] = mode_name[i];
   }
 }
 
@@ -136,7 +262,6 @@ void init_system() {
 
   pinMode(noise_button.pin, INPUT_PULLUP);
   pinMode(mode_button.pin, INPUT_PULLUP);
-  //pinMode(I2S_DIN_PIN, INPUT);
 
   memcpy(&CONFIG_DEFAULTS, &CONFIG, sizeof(CONFIG)); // Copy defaults values to second CONFIG object
 
@@ -148,28 +273,32 @@ void init_system() {
   set_mode_name(5, "VU");
   set_mode_name(6, "VU (DOT)");
 
-  uint64_t mac_address = ESP.getEfuseMac();
-  uint64_t mac_address_trunc = mac_address << 40;
-  chip_id = mac_address_trunc >> 40;
-
   init_serial(SERIAL_BAUD);
   init_sweet_spot();
   init_fs();
 
-  if (digitalRead(noise_button.pin) == LOW && digitalRead(mode_button.pin) == LOW){
+  // NOISE and MODE held down on boot
+  if (digitalRead(noise_button.pin) == LOW && digitalRead(mode_button.pin) == LOW) {
     restore_defaults();
   }
-  
+
   init_leds();
+  init_usb();
+
+  // MODE held down on boot
+  if (digitalRead(mode_button.pin) == LOW) {
+    enable_usb_update_mode();
+  }
+
   init_i2s();
   init_p2p();
   generate_a_weights();
   generate_window_lookup();
   generate_frequency_data();
 
-  Serial.println("SYSTEM INIT COMPLETE!");
+  USBSerial.println("SYSTEM INIT COMPLETE!");
 
-  if(CONFIG.BOOT_ANIMATION == true){
+  if (CONFIG.BOOT_ANIMATION == true) {
     intro_animation();
   }
 }
@@ -196,10 +325,10 @@ void log_fps(uint32_t t_now_us) {
 
   FPS = fps_sum / 10.0;
 
-  if(stream_fps == true){
-    Serial.print("sbs((fps=");
-    Serial.print(FPS);
-    Serial.println("))");
+  if (stream_fps == true) {
+    USBSerial.print("sbs((fps=");
+    USBSerial.print(FPS);
+    USBSerial.println("))");
   }
 
   t_last = t_now_us;

@@ -1,3 +1,5 @@
+extern void propagate_noise_reset();
+
 void start_noise_cal() {
   noise_complete = false;
   max_waveform_val = 0;
@@ -9,16 +11,17 @@ void start_noise_cal() {
   for (uint8_t i = 0; i < NUM_FREQS; i++) {
     noise_samples[i] = 0;
   }
-  Serial.print("STARTING NOISE CAL");
+  USBSerial.println("STARTING NOISE CAL");
 }
 
 void clear_noise_cal() {
+  propagate_noise_reset();
   for (uint16_t i = 0; i < NUM_FREQS; i++) {
     noise_samples[i] = 0;
   }
   save_config();
   save_ambient_noise_calibration();
-  Serial.println("NOISE CAL CLEARED");
+  USBSerial.println("NOISE CAL CLEARED");
 }
 
 void noise_cal_led_readout(){

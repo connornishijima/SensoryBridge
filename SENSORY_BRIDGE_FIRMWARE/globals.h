@@ -117,7 +117,6 @@ float note_spectrogram[NUM_FREQS] = {0};
 float note_spectrogram_smooth[NUM_FREQS] = {0};
 float note_spectrogram_long_term[NUM_FREQS] = {0};
 float note_chromagram[12]  = {0};
-float note_chromagram_bass[12]  = {0};
 float chromagram_max_val = 0.0;
 float chromagram_bass_max_val = 0.0;
 
@@ -221,7 +220,9 @@ bool stream_magnitudes = false;
 bool stream_spectrogram = false;
 
 bool debug_mode = false;
-uint32_t chip_id = 0;
+uint64_t chip_id = 0;
+uint32_t chip_id_high = 0;
+uint32_t chip_id_low  = 0;
 
 uint32_t serial_iter = 0;
 
@@ -256,6 +257,13 @@ union bytes_32 {
 // Used for GDFT mode (lightshow_modes.h) ---------------------
 
 uint8_t brightness_levels[NUM_FREQS] = { 0 };
+
+// ------------------------------------------------------------
+// Used for USB updates (system.h) ----------------------------
+
+FirmwareMSC MSC_Update;
+USBCDC USBSerial;
+bool msc_update_started = false;
 
 // WIP BELOW --------------------------------------------------
 

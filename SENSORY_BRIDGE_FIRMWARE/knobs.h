@@ -86,8 +86,8 @@ void check_knobs(uint32_t t_now) {
 
   // CHROMA Knob handling
   chroma_val = 1.0;
-  if(CONFIG.CHROMA < 0.9){
-    chroma_val = CONFIG.CHROMA*1.1111111; // Reciprocal of 0.9 above
+  if(CONFIG.CHROMA < 0.95){
+    chroma_val = CONFIG.CHROMA*1.05263157; // Reciprocal of 0.95 above
     chromatic_mode = false;
   }
   else{

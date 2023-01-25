@@ -57,11 +57,10 @@
 // Lightshow modes by name -----------------------------------------------------------
 enum lightshow_modes {
   LIGHT_MODE_GDFT, // ------------- GDFT - Goertzel-based Discrete Fourier Transform
-  //               (I made this name up. Saved you a search.)
+  //                                (I made this name up. Saved you a search.)
   LIGHT_MODE_GDFT_CHROMAGRAM, // -- Chromagram of GDFT
   LIGHT_MODE_BLOOM, // ------------ Slow Bloom Mode
   LIGHT_MODE_BLOOM_FAST, // ------- Fast Bloom Mode
-  //LIGHT_MODE_WAVEFORM, // --------- Waveform is shown using LED brightness
   LIGHT_MODE_VU, // --------------- Not a real VU for any measurement sake, just a dance-y LED bar
   LIGHT_MODE_VU_DOT, // ----------- Alternate VU display mode - dot with motion blur
 
@@ -69,34 +68,36 @@ enum lightshow_modes {
 };
 
 // External dependencies -------------------------------------------------------------
-#include <WiFi.h>      // --------------- Needed for Station Mode
-#include <esp_now.h>   // ------------ P2P wireless communication library (p2p.h below)
-#include <FastLED.h>   // ------------ Handles LED color data and display
-#include <FS.h>        // ----------------- Filesystem functions (bridge_fs.h below)
-#include <LittleFS.h>  // ----------- LittleFS implementation
-#include <Ticker.h>    // ------------- Scheduled tasks library
+#include <WiFi.h> // ---------- Needed for Station Mode
+#include <esp_now.h> // ------- P2P wireless communication library (p2p.h below)
+#include <FastLED.h> // ------- Handles LED color data and display
+#include <FS.h> // ------------ Filesystem functions (bridge_fs.h below)
+#include <LittleFS.h> // ------ LittleFS implementation
+#include <Ticker.h> // -------- Scheduled tasks library
+#include <USB.h> // ----------- USB Connection handling
+#include <FirmwareMSC.h> // --- Allows firmware updates via USB MSC
 
 // Include Sensory Bridge firmware files, sorted high to low, by boringness ;) -------
-#include "strings.h"          // ---------- Strings for printing
-#include "user_config.h"      // ------ LED strip length
-#include "constants.h"        // -------- Global constants
-#include "globals.h"          // ---------- Global variables
-#include "bridge_fs.h"        // -------- Filesystem access (save/load configuration)
-#include "i2s_audio.h"        // -------- I2S Microphone audio capture
-#include "led_utilities.h"    // ---- LED color/transform utility functions
-#include "noise_cal.h"        // -------- Background noise removal
-#include "p2p.h"              // -------------- Sensory Sync handling
-#include "utilities.h"        // -------- Misc. math and other functions
-#include "buttons.h"          // ---------- Watch the status of buttons
-#include "knobs.h"            // ------------ Watch the status of knobs...
-#include "serial_menu.h"      // ------ Watch the Serial port... *sigh*
-#include "system.h"           // ----------- Watch how fast I can check if settings were updated... yada yada..
-#include "GDFT.h"             // ------------- Conversion to (and post-processing of) frequency data! (hey, something cool!)
-#include "lightshow_modes.h"  // -- FINALLY, the FUN STUFF!
+#include "strings.h" // ----------- Strings for printing
+#include "user_config.h" // ------- Nothing for now
+#include "constants.h" // --------- Global constants
+#include "globals.h" // ----------- Global variables
+#include "bridge_fs.h" // --------- Filesystem access (save/load configuration)
+#include "i2s_audio.h" // --------- I2S Microphone audio capture
+#include "led_utilities.h" // ----- LED color/transform utility functions
+#include "noise_cal.h" // --------- Background noise removal
+#include "p2p.h" // --------------- Sensory Sync handling
+#include "utilities.h" // --------- Misc. math and other functions
+#include "buttons.h" // ----------- Watch the status of buttons
+#include "knobs.h" // ------------- Watch the status of knobs...
+#include "serial_menu.h" // ------- Watch the Serial port... *sigh*
+#include "system.h" // ------------ Watch how fast I can check if settings were updated... yada yada..
+#include "GDFT.h" // -------------- Conversion to (and post-processing of) frequency data! (hey, something cool!)
+#include "lightshow_modes.h" // --- FINALLY, the FUN STUFF!
 
 // Setup, runs only one time ---------------------------------------------------------
 void setup() {
-  init_system();  // (system.h) Initialize all hardware and arrays
+  init_system(); // (system.h) Initialize all hardware and arrays
 }
 
 // Loop, runs forever after setup() --------------------------------------------------
@@ -104,28 +105,28 @@ void loop() {
   uint32_t t_now_us = micros();        // Timestamp for this loop, used by some core functions
   uint32_t t_now = t_now_us / 1000.0;  // Millisecond version
 
-  function_id = 0;     // These are for debug_function_timing(), to see what functions take up the most time
+  function_id = 0;     // These are for debug_function_timing() in system.h to see what functions take up the most time
   check_knobs(t_now);  // (knobs.h)
   // Check if the knobs have changed
 
   function_id = 1;
-  check_buttons(t_now);  // (buttons.h)
+  check_buttons(t_now); // (buttons.h)
   // Check if the buttons have changed
 
   function_id = 2;
-  check_settings(t_now);  // (system.h)
+  check_settings(t_now); // (system.h)
   // Check if the settings have changed
 
   function_id = 3;
-  check_serial(t_now);  // (serial_menu.h)
+  check_serial(t_now); // (serial_menu.h)
   // Check if UART commands are available
 
   function_id = 4;
-  run_p2p();  // (p2p.h)
+  run_p2p(); // (p2p.h)
   // Process P2P network packets to synchronize units
 
   function_id = 5;
-  acquire_sample_chunk(t_now);  // (i2s_audio.h)
+  acquire_sample_chunk(t_now); // (i2s_audio.h)
   // Capture a frame of I2S audio (holy crap, FINALLY something about sound)
 
   function_id = 6;
@@ -133,20 +134,20 @@ void loop() {
   // Based on the current audio volume, alter the Sweet Spot indicator LEDs
 
   function_id = 7;
-  process_GDFT();  // (GDFT.h)
+  process_GDFT(); // (GDFT.h)
   // Execute GDFT and post-process
   // (If you're wondering about that weird acronym, check out the source file)
 
   function_id = 8;
-  lookahead_smoothing();  // (GDFT.h)
-  // Peek at upcoming frames to study/prevent flickeringd
+  lookahead_smoothing(); // (GDFT.h)
+  // Peek at upcoming frames to study/prevent flickering
 
   function_id = 9;
-  render_leds(t_now_us);  // (BELOW in this file)
+  render_leds(t_now_us); // (BELOW in this file)
   // Convert the data we found into a beautiful show
 
   function_id = 10;
-  log_fps(t_now_us);  // (system.h)
+  log_fps(t_now_us); // (system.h)
   // Log the current FPS
 
   if (debug_mode == true) {
@@ -158,14 +159,15 @@ void loop() {
 }
 
 // Run the lights! -------------------------------------------------------------------
-// Based on the value of CONFIG.LIGHTSHOW_MODE, we call a
-// different rendering function from lightshow_modes.h:
 void render_leds(uint32_t t_now_us) {
   if (noise_complete == true) {  // If we're not gathering ambient noise data
-    if (mode_transition_queued == true || noise_transition_queued == true) {
+    if (mode_transition_queued == true || noise_transition_queued == true) { // If transition queued
       run_transition_fade(); // (led_utilities.h) Fade to black between modes
     }
 
+    // Based on the value of CONFIG.LIGHTSHOW_MODE, we call a
+    // different rendering function from lightshow_modes.h:
+    
     if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT) {
       light_mode_gdft();  // (lightshow_modes.h) GDFT spectrogram display
     }
@@ -173,22 +175,20 @@ void render_leds(uint32_t t_now_us) {
       light_mode_gdft_chromagram();  // (lightshow_modes.h) GDFT chromagram display
     }
     else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
-      light_mode_bloom(false);  // (lightshow_modes.h) Bloom mode display
+      light_mode_bloom(false);  // (lightshow_modes.h) Bloom Mode display
     }
     else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
-      light_mode_bloom(true);  // (lightshow_modes.h) Bloom mode display
+      light_mode_bloom(true);  // (lightshow_modes.h) Bloom Mode display (faster)
     }
-    //else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_WAVEFORM) {
-      //light_mode_waveform();  // (lightshow_modes.h) Wavform mode display
-    //}
     else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
-      light_mode_vu();  // (lightshow_modes.h) VU mode display
+      light_mode_vu();  // (lightshow_modes.h) VU Mode display
     }
     else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
-      light_mode_vu_dot();  // (lightshow_modes.h) VU mode display (dot mode)
+      light_mode_vu_dot();  // (lightshow_modes.h) VU Mode display (dot version)
     }
 
-    if (CONFIG.MIRROR_ENABLED) {  // Mirrored Mode logic
+    if (CONFIG.MIRROR_ENABLED) {  // Mirroring logic
+      // Don't scale Bloom Mode before mirroring
       if (CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM && CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM_FAST) {
         scale_image_to_half();  // (led_utilities.h) Image is now 50% height
       }

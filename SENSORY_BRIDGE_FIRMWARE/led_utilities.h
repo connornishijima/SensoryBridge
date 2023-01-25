@@ -90,25 +90,25 @@ void init_leds() {
   leds_out = new CRGB[CONFIG.LED_COUNT];
 
   if (CONFIG.LED_TYPE == LED_NEOPIXEL) {
-    if(CONFIG.LED_COLOR_ORDER == RGB){
+    if (CONFIG.LED_COLOR_ORDER == RGB) {
       FastLED.addLeds<WS2812B, LED_DATA_PIN, RGB>(leds_out, CONFIG.LED_COUNT);
     }
-    else if(CONFIG.LED_COLOR_ORDER == GRB){
+    else if (CONFIG.LED_COLOR_ORDER == GRB) {
       FastLED.addLeds<WS2812B, LED_DATA_PIN, GRB>(leds_out, CONFIG.LED_COUNT);
     }
-    else if(CONFIG.LED_COLOR_ORDER == BGR){
+    else if (CONFIG.LED_COLOR_ORDER == BGR) {
       FastLED.addLeds<WS2812B, LED_DATA_PIN, BGR>(leds_out, CONFIG.LED_COUNT);
     }
   }
-  
+
   else if (CONFIG.LED_TYPE == LED_DOTSTAR) {
-    if(CONFIG.LED_COLOR_ORDER == RGB){
+    if (CONFIG.LED_COLOR_ORDER == RGB) {
       FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, CONFIG.LED_COUNT);
     }
-    else if(CONFIG.LED_COLOR_ORDER == GRB){
+    else if (CONFIG.LED_COLOR_ORDER == GRB) {
       FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, GRB>(leds_out, CONFIG.LED_COUNT);
     }
-    else if(CONFIG.LED_COLOR_ORDER == BGR){
+    else if (CONFIG.LED_COLOR_ORDER == BGR) {
       FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, BGR>(leds_out, CONFIG.LED_COUNT);
     }
   }
@@ -122,8 +122,8 @@ void init_leds() {
 
   leds_started = true;
 
-  Serial.print("INIT_LEDS: ");
-  Serial.println(leds_started == true ? PASS : FAIL);
+  USBSerial.print("INIT_LEDS: ");
+  USBSerial.println(leds_started == true ? PASS : FAIL);
 }
 
 void save_leds_to_last() {
@@ -339,11 +339,12 @@ void run_transition_fade() {
         mode_destination = -1;
       }
     }
+    
     if (noise_transition_queued == true) { // If transition for NOISE button press
       noise_transition_queued = false;
       // start noise cal
       if (debug_mode) {
-        Serial.println("COLLECTING AMBIENT NOISE SAMPLES...");
+        USBSerial.println("COLLECTING AMBIENT NOISE SAMPLES...");
       }
       propagate_noise_cal();
       start_noise_cal();

@@ -2,50 +2,48 @@
   Sensory Bridge FILESYSTEM ACCESS
   ----------------------------------------*/
 
-void reboot() {
-  Serial.println("--- ! REBOOTING in 1 second to apply changes (You may need to restart the Serial Monitor)");
-  Serial.flush();
-  delay(1000);
-  ESP.restart();
-}
+extern void reboot(); // system.h
 
+// Restore all defaults defined in globals.h by removing saved data and rebooting
 void factory_reset() {
-  Serial.print("Deleting config.bin: ");
+  USBSerial.print("Deleting config.bin: ");
   if (LittleFS.remove("/config.bin")) {
-    Serial.println("file deleted");
+    USBSerial.println("file deleted");
   } else {
-    Serial.println("delete failed");
+    USBSerial.println("delete failed");
   }
 
-  Serial.print("Deleting noise_cal.bin: ");
+  USBSerial.print("Deleting noise_cal.bin: ");
   if (LittleFS.remove("/noise_cal.bin")) {
-    Serial.println("file deleted");
+    USBSerial.println("file deleted");
   } else {
-    Serial.println("delete failed");
+    USBSerial.println("delete failed");
   }
 
   reboot();
 }
 
+// Restore only configuration defaults
 void restore_defaults() {
-  Serial.print("Deleting config.bin: ");
+  USBSerial.print("Deleting config.bin: ");
   if (LittleFS.remove("/config.bin")) {
-    Serial.println("file deleted");
+    USBSerial.println("file deleted");
   } else {
-    Serial.println("delete failed");
+    USBSerial.println("delete failed");
   }
 
   reboot();
 }
 
+// Save configuration to LittleFS
 void save_config() {
   if (debug_mode) {
-    Serial.print("LITTLEFS: ");
+    USBSerial.print("LITTLEFS: ");
   }
   File file = LittleFS.open("/config.bin", FILE_WRITE);
   if (!file) {
     if (debug_mode) {
-      Serial.println("Failed to open config.bin for writing!");
+      USBSerial.println("Failed to open config.bin for writing!");
     }
     return;
   } else {
@@ -58,53 +56,29 @@ void save_config() {
     }
 
     if (debug_mode) {
-      Serial.println("WROTE CONFIG SUCCESSFULLY");
+      USBSerial.println("WROTE CONFIG SUCCESSFULLY");
     }
   }
   file.close();
 }
 
+// Save configuration to LittleFS 10 seconds from now
 void save_config_delayed() {
   last_setting_change = millis();
   settings_updated = true;
 }
 
-void save_backup_config() {
-  if (debug_mode) {
-    Serial.print("LITTLEFS: ");
-  }
-  File file = LittleFS.open("/config.backup", FILE_WRITE);
-  if (!file) {
-    if (debug_mode) {
-      Serial.println("Failed to open config.backup for writing!");
-    }
-    return;
-  } else {
-    file.seek(0);
-    uint8_t config_buffer[128];
-    memcpy(config_buffer, &CONFIG, sizeof(CONFIG));
-
-    for (uint8_t i = 0; i < 128; i++) {
-      file.write(config_buffer[i]);
-    }
-
-    if (debug_mode) {
-      Serial.println("WROTE CONFIG BACKUP SUCCESSFULLY");
-    }
-  }
-  file.close();
-}
-
+// Load configuration from LittleFS
 void load_config() {
   if (debug_mode) {
-    Serial.print("LITTLEFS: ");
+    USBSerial.print("LITTLEFS: ");
   }
 
   bool queue_factory_reset = false;
   File file = LittleFS.open("/config.bin", FILE_READ);
   if (!file) {
     if (debug_mode) {
-      Serial.println("Failed to open config.bin for reading!");
+      USBSerial.println("Failed to open config.bin for reading!");
     }
     return;
   } else {
@@ -121,22 +95,22 @@ void load_config() {
     memcpy(&CONFIG_TEMP, config_buffer, sizeof(CONFIG_TEMP));
 
     if (debug_mode) {
-      Serial.print("STORED VERSION IS: ");
-      Serial.println(CONFIG_TEMP.VERSION);
+      USBSerial.print("STORED VERSION IS: ");
+      USBSerial.println(CONFIG_TEMP.VERSION);
 
-      Serial.print("CURRENT VERSION IS: ");
-      Serial.println(CONFIG_DEFAULTS.VERSION);
+      USBSerial.print("CURRENT VERSION IS: ");
+      USBSerial.println(CONFIG_DEFAULTS.VERSION);
     }
 
     if (CONFIG_TEMP.VERSION != CONFIG_DEFAULTS.VERSION) {
-      if(debug_mode){Serial.println("STORED CONFIG FILE IS OUTDATED!");}
-      //Serial.println("Factory resetting now to avoid potentially incompatible data!");
+      if(debug_mode){USBSerial.println("STORED CONFIG FILE IS OUTDATED!");}
+      //USBSerial.println("Factory resetting now to avoid potentially incompatible data!");
       //save_backup_config();
       //queue_factory_reset = true;
     }
     else {
       memcpy(&CONFIG, &CONFIG_TEMP, sizeof(CONFIG_TEMP));
-      if(debug_mode){Serial.println("READ CONFIG SUCCESSFULLY");}
+      if(debug_mode){USBSerial.println("READ CONFIG SUCCESSFULLY");}
     }
   }
   file.close();
@@ -146,11 +120,12 @@ void load_config() {
   }
 }
 
+// Save noise calibration to LittleFS
 void save_ambient_noise_calibration() {
-  if(debug_mode){Serial.print("SAVING AMBIENT_NOISE PROFILE... ");}
+  if(debug_mode){USBSerial.print("SAVING AMBIENT_NOISE PROFILE... ");}
   File file = LittleFS.open("/noise_cal.bin", FILE_WRITE);
   if (!file) {
-    if(debug_mode){Serial.println("Failed to open file for writing!");}
+    if(debug_mode){USBSerial.println("Failed to open file for writing!");}
     return;
   }
 
@@ -169,14 +144,15 @@ void save_ambient_noise_calibration() {
   }
 
   file.close();
-  if(debug_mode){Serial.println("SAVE COMPLETE");}
+  if(debug_mode){USBSerial.println("SAVE COMPLETE");}
 }
 
+// Load noise calibration from LittleFS
 void load_ambient_noise_calibration() {
-  if(debug_mode){Serial.print("LOADING AMBIENT_NOISE PROFILE... ");}
+  if(debug_mode){USBSerial.print("LOADING AMBIENT_NOISE PROFILE... ");}
   File file = LittleFS.open("/noise_cal.bin", FILE_READ);
   if (!file) {
-    if(debug_mode){Serial.println("Failed to open file for reading!");}
+    if(debug_mode){USBSerial.println("Failed to open file for reading!");}
     return;
   }
 
@@ -193,12 +169,13 @@ void load_ambient_noise_calibration() {
   }
 
   file.close();
-  if(debug_mode){Serial.println("LOAD COMPLETE");}
+  if(debug_mode){USBSerial.println("LOAD COMPLETE");}
 }
 
+// Initialize LittleFS
 void init_fs() {
-  Serial.print("INIT FILESYSTEM: ");
-  Serial.println(LittleFS.begin(true) == true ? PASS : FAIL);
+  USBSerial.print("INIT FILESYSTEM: ");
+  USBSerial.println(LittleFS.begin(true) == true ? PASS : FAIL);
 
   load_ambient_noise_calibration();
   load_config();

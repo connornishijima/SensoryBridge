@@ -2,7 +2,8 @@
   Sensory Bridge HARDWARE CONFIGURATION
 ----------------------------------------*/
 
-#define LED_COLOR_ORDER  GRB   // TODO
+// Every notable setting about hardware moved to the settings.sensorybridge.rocks site for now!
+// No more hardcoding values for strip length and such
 
 /*----------------------------------------
   Sensory Bridge SOFTWARE CONFIGURATION

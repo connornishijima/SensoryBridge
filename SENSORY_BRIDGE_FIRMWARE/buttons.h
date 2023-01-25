@@ -25,7 +25,6 @@ void check_buttons(uint32_t t_now) {
 
     if (t_now - noise_button.last_down > 250 && noise_button.last_up < noise_button.last_down) { // Still held, and for more than 250ms (long press)
       if (CONFIG.IS_MAIN_UNIT || main_override) { // If main, clear noise cal
-        propagate_noise_reset();
         clear_noise_cal();
       } else { // if not, complain
         identify_main_unit();
@@ -77,7 +76,7 @@ void check_buttons(uint32_t t_now) {
         skip_click = true;
         mode_transition_queued = false;
         MASTER_BRIGHTNESS = 1.0;
-        if(debug_mode){Serial.println("DOUBLE CLICK");}
+        if(debug_mode){USBSerial.println("DOUBLE CLICK");}
       }
 
       uint32_t press_duration = mode_button.last_up - mode_button.last_down;

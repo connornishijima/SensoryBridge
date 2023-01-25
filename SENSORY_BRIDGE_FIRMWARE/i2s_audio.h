@@ -37,8 +37,8 @@ const i2s_pin_config_t pin_config = { // These too
 void init_i2s() {
   // Init I2S Driver
   esp_err_t result = i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
-  Serial.print("INIT I2S: ");
-  Serial.println(result == ESP_OK ? PASS : FAIL);
+  USBSerial.print("INIT I2S: ");
+  USBSerial.println(result == ESP_OK ? PASS : FAIL);
 
   // ESP32-S2 changes to help SPH0645 mic
 #if defined(CONFIG_IDF_TARGET_ESP32S2)
@@ -48,8 +48,8 @@ void init_i2s() {
 
   // Set I2S pins
   result = i2s_set_pin(I2S_PORT, &pin_config);
-  Serial.print("I2S SET PINS: ");
-  Serial.println(result == ESP_OK ? PASS : FAIL);
+  USBSerial.print("I2S SET PINS: ");
+  USBSerial.println(result == ESP_OK ? PASS : FAIL);
 }
 
 void acquire_sample_chunk(uint32_t t_now) {
@@ -57,7 +57,6 @@ void acquire_sample_chunk(uint32_t t_now) {
   static bool     silence_temp = false;
   static uint32_t silence_switched = 0;
   static float    silent_scale_last = 1.0;
-  static uint32_t iter = 0;
 
   size_t bytes_read = 0;
   i2s_read(I2S_PORT, i2s_samples_raw, CONFIG.SAMPLES_PER_CHUNK * sizeof(int32_t), &bytes_read, portMAX_DELAY);
@@ -91,14 +90,14 @@ void acquire_sample_chunk(uint32_t t_now) {
   }
 
   if (stream_audio == true) {
-    Serial.print("sbs((audio=");
+    USBSerial.print("sbs((audio=");
     for (uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++) {
-      Serial.print(waveform[i]);
+      USBSerial.print(waveform[i]);
       if (i < CONFIG.SAMPLES_PER_CHUNK - 1) {
-        Serial.print(',');
+        USBSerial.print(',');
       }
     }
-    Serial.println("))");
+    USBSerial.println("))");
   }
 
   if (noise_complete == false) {

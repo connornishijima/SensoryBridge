@@ -175,7 +175,7 @@ void light_mode_waveform() {
   sum_color = hsv;
   */
 
-  float sum_color_float[3] = {sum_color.r, sum_color.g, sum_color.b};
+  float sum_color_float[3] = {float(sum_color.r), float(sum_color.g), float(sum_color.b)};
 
   sum_color_float[0] = sum_color_float[0] * 0.05 + sum_color_last[0] * 0.95;
   sum_color_float[1] = sum_color_float[1] * 0.05 + sum_color_last[1] * 0.95;
@@ -267,7 +267,7 @@ void light_mode_vu() {
   hsv.v = qadd8(hsv.v, 64);
   sum_color = hsv;
 
-  float sum_color_float[3] = {sum_color.r, sum_color.g, sum_color.b};
+  float sum_color_float[3] = {float(sum_color.r), float(sum_color.g), float(sum_color.b)};
 
   sum_color_float[0] = sum_color_float[0] * 0.05 + sum_color_last[0] * 0.95;
   sum_color_float[1] = sum_color_float[1] * 0.05 + sum_color_last[1] * 0.95;
@@ -330,7 +330,7 @@ void light_mode_vu_dot() {
   hsv.v = qadd8(hsv.v, 64);
   sum_color = hsv;
 
-  float sum_color_float[3] = {sum_color.r, sum_color.g, sum_color.b};
+  float sum_color_float[3] = {float(sum_color.r), float(sum_color.g), float(sum_color.b)};
 
   sum_color_float[0] = sum_color_float[0] * 0.05 + sum_color_last[0] * 0.95;
   sum_color_float[1] = sum_color_float[1] * 0.05 + sum_color_last[1] * 0.95;

@@ -1,6 +1,6 @@
 //
 // Welcome to the GDFT file: this is the core of Sensory Bridge.
-// This is where time-domain audio is coverted into a
+// This is where time-domain audio is converted into a
 // frequency-domain representation for your viewing pleasure. This
 // file doesn't actually contain LED code. That's lightshow_modes.h,
 // which references values calculated here on each frame.
@@ -27,7 +27,7 @@
 //    By running Goertzel's algorithm 64 times in parallel I can
 //    choose my own bin spacing, and in this case Sensory Bridge is
 //    watching the upper 64 keys of an 88-key piano's frequency
-//    range: 110Hz to 4186Hz.
+//    range: 110Hz to 4186Hz (by default).
 //
 //    This means that every "half-step" up in pitch in an
 //    instrument is it's own distinct frequency bin, with only
@@ -44,7 +44,7 @@
 //    frequencies.
 //
 //
-// This GDFT method, which operates on a sliding window with 128
+// This GDFT method, which operates on a sliding window with 256
 // new samples per frame, (i2s_audio.h) combined with a shitload
 // of interesting post-processing methods I've documented below
 // are what's behind the eye-catching shows on Sensory Bridge!
@@ -52,13 +52,11 @@
 // If you like that I've shared this code, *please* support my work
 // by purchasing genuine hardware or telling your friends about it!
 //
+// https://github.com/sponsors/connornishijima
 // LIXIE LABS
 
-// Obscure magic happens here
+// Obscure audio magic happens here
 void IRAM_ATTR process_GDFT() {
-  static uint32_t iter = 0;
-  iter++;
-
   // Reset magnitude caps every frame
   for (uint8_t i = 0; i < NUM_ZONES; i++) {
     max_mags[i] = CONFIG.MAGNITUDE_FLOOR;  // Higher than the average noise floor
@@ -72,16 +70,14 @@ void IRAM_ATTR process_GDFT() {
 
   // Run GDFT (Goertzel-based Discrete Fourier Transform) with 64 frequencies
   // Fixed-point code adapted from example here: https://sourceforge.net/p/freetel/code/HEAD/tree/misc/goertzal/goertzal.c
-  for (uint16_t i = 0; i < NUM_FREQS; i++) {
+  for (uint16_t i = 0; i < NUM_FREQS; i++) { // Run 64 times
     int32_t q0, q1, q2;
     int64_t mult;
-
-    uint32_t start_index = SAMPLE_HISTORY_LENGTH - frequencies[i].block_size - 1;
-
+    
     q1 = 0;
     q2 = 0;
 
-    for (uint16_t n = 0; n < frequencies[i].block_size; n++) {
+    for (uint16_t n = 0; n < frequencies[i].block_size; n++) { // Run Goertzel for "block_size" iterations
       mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
       q0 = (sample_window[SAMPLE_HISTORY_LENGTH - 1 - n] >> 6) + (mult >> 14) - q2;
       q2 = q1;
@@ -89,50 +85,51 @@ void IRAM_ATTR process_GDFT() {
     }
 
     mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
-    magnitudes[i] = q2 * q2 + q1 * q1 - ((int32_t)(mult >> 14)) * q2;
+    magnitudes[i] = q2 * q2 + q1 * q1 - ((int32_t)(mult >> 14)) * q2; // Calculate raw magnitudes
 
-    magnitudes[i] *= float(frequencies[i].block_size_recip);
+    magnitudes[i] *= float(frequencies[i].block_size_recip); // Normalize output
 
-    if (magnitudes[i] < 0.0) {
+    if (magnitudes[i] < 0.0) { // Prevent negative values
       magnitudes[i] = 0.0;
     }
   }
 
+  // When enabled, streams magnitudes[] array over Serial
   if (stream_magnitudes == true) {
     if (serial_iter >= 2) {  // Don't print every frame
       serial_iter = 0;
-      Serial.print("sbs((magnitudes=");
+      USBSerial.print("sbs((magnitudes=");
       for (uint16_t i = 0; i < NUM_FREQS; i++) {
-        Serial.print(uint32_t(magnitudes[i]));
+        USBSerial.print(uint32_t(magnitudes[i]));
         if (i < NUM_FREQS - 1) {
-          Serial.print(',');
+          USBSerial.print(',');
         }
       }
-      Serial.println("))");
+      USBSerial.println("))");
     }
   }
 
-  // Gather noise data
+  // Gather noise data if noise_complete == false
   if (noise_complete == false) {
     for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-      if (magnitudes[i]*1.1 > noise_samples[i]) {
-        noise_samples[i] = magnitudes[i]*1.1;
+      if (magnitudes[i] > noise_samples[i]) { 
+        noise_samples[i] = magnitudes[i];
       }
     }
     noise_iterations++;
-    if (noise_iterations >= 256) {
+    if (noise_iterations >= 256) { // Calibration complete
       noise_complete = true;
-      Serial.println("NOISE_CAL_COMPLETE");
-      CONFIG.DC_OFFSET = dc_offset_sum / 256.0;
-      save_ambient_noise_calibration();
-      save_config();
+      USBSerial.println("NOISE CAL COMPLETE");
+      CONFIG.DC_OFFSET = dc_offset_sum / 256.0; // Calculate average DC offset and store it
+      save_ambient_noise_calibration(); // Save results to noise_cal.bin
+      save_config(); // Save config to config.bin
     }
   }
 
   // Apply noise reduction data, estimate max values
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
     if (noise_complete == true) {
-      magnitudes[i] -= noise_samples[i] * 1.5;
+      magnitudes[i] -= noise_samples[i] * 1.5; // Treat noise 1.5x louder than calibration
       if (magnitudes[i] < 0.0) {
         magnitudes[i] = 0.0;
       }
@@ -145,21 +142,17 @@ void IRAM_ATTR process_GDFT() {
   }
 
   if (stream_max_mags == true) {
-    Serial.print("sbs((max_mags=");
+    USBSerial.print("sbs((max_mags=");
     for (uint8_t i = 0; i < NUM_ZONES; i++) {
-      Serial.print(max_mags[i]);
+      USBSerial.print(max_mags[i]);
       if (i < NUM_ZONES - 1) {
-        Serial.print(',');
+        USBSerial.print(',');
       }
     }
-    Serial.println("))");
+    USBSerial.println("))");
   }
 
-  // Now let's do some weird math on the MOOD knob.
-  //
-  // TODO: I could probably do the MOOD knob math less often than every frame.
-  //
-  // Two different algorithms are used to smooth the output display:
+  // Two different algorithms are used to smooth the display output:
   //
   // Smoothing Type A: "Followers"
   // -----------------------------
@@ -244,14 +237,14 @@ void IRAM_ATTR process_GDFT() {
   }
 
   if (stream_max_mags_followers == true) {
-    Serial.print("sbs((max_mags_followers=");
+    USBSerial.print("sbs((max_mags_followers=");
     for (uint8_t i = 0; i < NUM_ZONES; i++) {
-      Serial.print(max_mags_followers[i]);
+      USBSerial.print(max_mags_followers[i]);
       if (i < NUM_ZONES - 1) {
-        Serial.print('\t');
+        USBSerial.print('\t');
       }
     }
-    Serial.println("))");
+    USBSerial.println("))");
   }
 
   // Make Spectrogram from raw magnitudes
@@ -280,7 +273,6 @@ void IRAM_ATTR process_GDFT() {
   chromagram_max_val = 0.0;
   for (uint8_t i = 0; i < 12; i++) {
     note_chromagram[i] = 0;
-    note_chromagram_bass[i] = 0;
   }
   for (uint8_t octave = 0; octave < 6; octave++) {
     for (uint8_t note = 0; note < 12; note++) {
@@ -356,85 +348,15 @@ void lookahead_smoothing() {
   if (stream_spectrogram == true) {
     if (serial_iter >= 2) {  // Don't print every frame
       serial_iter = 0;
-      Serial.print("sbs((spectrogram=");
+      USBSerial.print("sbs((spectrogram=");
       for (uint16_t i = 0; i < NUM_FREQS; i++) {
         uint16_t bin = 999 * note_spectrogram_smooth[i];
-        Serial.print(bin);
+        USBSerial.print(bin);
         if (i < NUM_FREQS - 1) {
-          Serial.print(',');
+          USBSerial.print(',');
         }
       }
-      Serial.println("))");
-    }
-  }
-}
-
-// ----------------------------------------------------------------------------
-//
-// (Work in progress code below, may delete later)
-//
-// ----------------------------------------------------------------------------
-
-// THIS DOESN'T WORK LIKE I THOUGHT IT WOULD, SORRY
-void detect_key() {
-  for (uint8_t k = 0; k < 24; k++) {
-    scale_scores[k] = 0.0;
-  }
-
-  for (uint8_t k = 0; k < 24; k++) {
-    uint8_t note = 0;
-    for (uint8_t i = 0; i < 60; i++) {
-      float bin = note_spectrogram_long_term[i];
-      float match = (1.0 - fabs(bin - float(musical_scales[k][note]))) * bin;
-      note++;
-      if (note >= 12) {
-        note = 0;
-      }
-
-      scale_scores[k] += match;
-
-      if (scale_scores[k] > 60.0) {
-        scale_scores[k] = 60.0;
-      } else if (scale_scores[k] < 0.0) {
-        scale_scores[k] = 0.0;
-      }
-    }
-    scale_scores[k] /= 60.0;
-  }
-
-  int8_t max_index = -1;
-  float max_val = 0.0;
-  for (uint8_t i = 0; i < 24; i++) {
-    if (scale_scores[i] > max_val) {
-      max_val = scale_scores[i];
-      max_index = i;
-    }
-  }
-
-  //Serial.print(   notes_chromatic[max_index] );
-  //Serial.println( sharps[max_index]          );
-}
-
-
-// DEBUG FUNCTION FOR NOW
-void get_average_value() {
-  float sum = 0.0;
-  float max_val = 0.0;
-  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-    sum += note_spectrogram_smooth[i];
-
-    if (note_spectrogram_smooth[i] > max_val) {
-      max_val = note_spectrogram_smooth[i];
-    }
-  }
-  sum /= float(NUM_FREQS);
-
-  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-    note_spectrogram_smooth[i] = ((note_spectrogram_smooth[i] * note_spectrogram_smooth[i]) * 0.5 + note_spectrogram_smooth[i] * 0.5);
-
-    note_spectrogram_smooth[i] *= 2.0;
-    if (note_spectrogram_smooth[i] > 1.0) {
-      note_spectrogram_smooth[i] = 1.0;
+      USBSerial.println("))");
     }
   }
 }
