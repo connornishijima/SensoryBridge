@@ -27,7 +27,7 @@ void run_sweet_spot() {
     float led_level = 1.0 - position_delta;
     led_level *= led_level;
     //                                                Never fully dim
-    led_power[uint8_t(i + 1)] = 4095 * led_level * (0.1 + silent_scale * 0.9) * sweet_spot_brightness * CONFIG.PHOTONS;
+    led_power[uint8_t(i + 1)] = 256 * led_level * (0.1 + silent_scale * 0.9) * sweet_spot_brightness * (CONFIG.PHOTONS * CONFIG.PHOTONS);
   }
 
   ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   led_power[0]);
