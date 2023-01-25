@@ -91,7 +91,7 @@ Same as above, but represented with a dot instead of a bar, staying a constant b
 
 # **SWEET SPOT**
 
-At the front of the base unit are three LEDs, which indicate if you've set your Boost knob correctly for the music volume and distance! Tune the Boost until the center (green) LED is lit up during an average loudness level of your music. Once set, it shouldn't need to be changed between songs!
+At the front of the base unit are three LEDs, which indicate if your music is playing too quietly for the auto-ranger to account for, or if it's too loud! (Close to clipping!)
 
 # 
 
@@ -99,7 +99,7 @@ At the front of the base unit are three LEDs, which indicate if you've set your 
 
 # SENSORY BRIDGE is **FLEXIBLE**
 
-While compatible with any WS2812B-based LED strip, (just use the screw terminals at the back!) there's also the option of using the **"Mini Mast"**, a dense strip of 128 1.5mm RGB LEDs on a 260mm long PCB! It just plugs directly into the Sensory Bridge accessory port, making for a very portable solution!
+While compatible with any WS2812B or APA102/SK9822-based LED strip (just use the screw terminals at the back!) there's also the option of using the **"Mini Mast"**, a dense strip of 128 1.5mm RGB LEDs on a 260mm long PCB! It just plugs directly into the Sensory Bridge accessory port, making for a very portable solution!
 
 # 
 
@@ -136,7 +136,7 @@ To save on redundant materials you might already own, **your Sensory Bridge does
 
 # FUTURE **PLANS**
 
-Sensory Bridge is going to undergo some upgrades in the following months! You'll be able to easily update to the latest firmware using the Arduino IDE.
+Sensory Bridge is going to undergo some upgrades in the following months! You'll be able to easily [update to the latest firmware in minutes with this guide](DEAD LINK).
 
 **Currently planned features are:**
 
