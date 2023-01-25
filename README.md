@@ -12,7 +12,7 @@ For the latest stable release of the Sensory Bridge firmware, **[visit the Relea
 
 **This isn't the usual "sound-reactive LEDs" you've seen for years.**
 
-**Sensory Bridge is built from the ground up as an open, powerful bridge between sight and sound.** With a show that's reactive to notation, vibrato and more, it produces very unique and pleasant-to-look-at light shows which synchronize to your music without any visible latency. (A built-in MEMS microphone constantly studies what it hears using the [Fast Fourier Transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform), at more than 60 FPS!)
+**Sensory Bridge is built from the ground up as an open, powerful bridge between sight and sound.** With a show that's reactive to notation, vibrato and more, it produces very unique and pleasant-to-look-at light shows which synchronize to your music without any visible latency. (A built-in MEMS microphone constantly studies what it hears using a special-sauce Goertzel-based Discrete Fourier Transform, at 100 FPS!)
 
 It has to be seen to be believed, *which the video demos below can help with:*
 
@@ -37,9 +37,9 @@ It has to be seen to be believed, *which the video demos below can help with:*
 
 Too bright? *Dim down the show* with the **PHOTONS** knob. The FastLED code in the firmware will use dithering to keep producing color nicely at lower brightness levels.
 
-### BOOST KNOB
+### CHROMA KNOB
 
-Need to keep the music down? Turn up the **BOOST** knob, and Sensory Bridge will *adjust its sensitivity to account for quieter or more distant music sources.*
+Custom color or automated color based on the music's notation? Choose with the **CHROMA** knob, where turning it all the way to the top enables automated color changes.
 
 ### MOOD KNOB
 
@@ -53,35 +53,35 @@ This knob is special. **MOOD** controls *how quickly your LEDs will react to cha
 
 ### NOISE BUTTON
 
-Running the A/C? Is the washing machine suddenly on the rinse cycle? Don't worry, just pause the music for a moment and press the **NOISE BUTTON** to run a 3-second calibration to automagically have noisy background ambience removed from your light show.
+Running the A/C? Is the washing machine suddenly on the spin cycle? Don't worry, just pause the music for a moment and press the **NOISE BUTTON** to run a 3-second calibration to *automagically* have noisy background ambience removed from your light show.
 
 ### MODE BUTTON
 
 Sensory Bridge currently has 6 built-in light show modes that you can cycle through:
 
-#### "Duet Mode"
+#### "Spectrogram Mode"
 
-This is the default show seen in the videos, based on FFT data. Color slowly cycles when silent, and is temporarily cycled faster when all FFT bins trend upward, such as a snare drum hit after a moment of silence.
+This is the default show seen in the videos, based on Discrete Fourier Transform data. Each octave of notation shown on the display has a spectrum of colors for the individual notes, which are lit in sync with your music!
 
-#### "Duet Mode" (Mirrored)
+#### "Chromagram Mode"
 
-Same as above, except the image is mirrored out from the middle of the LED strip! This is especially nice looking on horizontally-mounted LED strips.
-
-#### "Duet Mode" (Inverted)
-
-This is the default show seen in the videos, based on FFT data, *however*, the brightness has been inverted. (Silence = all LEDs on) This mode can reduce perceived flashing in a room with no other light sources.
-
-#### "Duet Mode" (Inverted, Mirrored)
-
-Same as above, except the image is mirrored out from the middle of the LED strip!
+Similar to Spectrogram Mode, but all octaves of notes are rolled into one! Best with the **MOOD** knob at a low to medium setting.
 
 #### "Bloom Mode"
 
-This mode differs from the others. The intensity of the audio is shown in the center of the LED strip, and is diffused outward as time passes, similar to a "waterfall" display. Color is calculated from the pitches detected in FFT.
+This mode differs from the others. The intensity of the audio is shown in the center of the LED strip, and is diffused outward in a non-linear fashion as time passes, leading to a 2001 "Stargate Sequence" effect!. Color is derived from the notes your music is playing.
+
+#### "Bloom Mode" (Faster)
+
+Same as above, but double the speed for when you're partying hard!
 
 #### "VU Meter Mode"
 
 It's a classic! A bouncing bar graph represents the current loudness of the music.
+
+#### "VU Meter Mode (Dot)"
+
+Same as above, but represented with a dot instead of a bar, staying a constant brightness.
 
 ### ***MORE MODES WILL BE RELEASED IN FUTURE FIRMWARE UPDATES!***
 
