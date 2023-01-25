@@ -19,7 +19,6 @@ void bytes_to_hex_string(const byte bytes[4], char hex_string[9]) {
   snprintf(hex_string, 9, "%02X%02X%02X%02X", bytes[0], bytes[1], bytes[2], bytes[3]);
 }
 
-
 void print_chip_id() {
   chip_id = ESP.getEfuseMac(); // Get the chip ID as a uint64_t
   

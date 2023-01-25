@@ -174,6 +174,9 @@ void dump_info() {
   USBSerial.print("CONFIG.STANDBY_DIMMING: ");
   USBSerial.println(CONFIG.STANDBY_DIMMING);
 
+  USBSerial.print("CONFIG.REVERSE_ORDER: ");
+  USBSerial.println(CONFIG.REVERSE_ORDER);
+
   USBSerial.print("CONFIG.IS_MAIN_UNIT: ");
   USBSerial.println(CONFIG.IS_MAIN_UNIT);
 
@@ -275,6 +278,7 @@ void parse_command(char* command_buf) {
     USBSerial.println("                                    identify | Flashes the LEDs twice in yellow");
     USBSerial.println("                              set_mode=[int] | Set the mode number");
     USBSerial.println("         mirror_enabled=[true/false/default] | Remotely toggle lightshow mirroring");
+    USBSerial.println("          reverse_order=[true/false/default] | Toggle whether image is flipped upside down before final rendering");
     USBSerial.println("                         get_mode_name=[int] | Get a mode's name by ID (index)");
     USBSerial.println("                               stream=[type] | Stream live data to a Serial Plotter.");
     USBSerial.println("                                               Options are: audio, fps, max_mags, max_mags_followers, magnitudes, spectrogram");
@@ -994,6 +998,32 @@ void parse_command(char* command_buf) {
         USBSerial.println("BASS MODE ENABLED");
         tx_end();
         reboot();
+      }
+    }
+
+    // Set if image should be reversed ------------------------
+    else if (strcmp(command_type, "reverse_order") == 0) {
+      bool good = false;
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.REVERSE_ORDER = CONFIG_DEFAULTS.REVERSE_ORDER;
+        good = true;
+      }
+      else if (strcmp(command_data, "true") == 0) {
+        CONFIG.REVERSE_ORDER = true;
+        good = true;
+      } else if (strcmp(command_data, "false") == 0) {
+        CONFIG.REVERSE_ORDER = false;
+        good = true;
+      } else {
+        bad_command(command_type, command_data);
+      }
+
+      if (good) {
+        save_config_delayed();
+        tx_begin();
+        USBSerial.print("CONFIG.REVERSE_ORDER: ");
+        USBSerial.println(CONFIG.REVERSE_ORDER);
+        tx_end();
       }
     }
 

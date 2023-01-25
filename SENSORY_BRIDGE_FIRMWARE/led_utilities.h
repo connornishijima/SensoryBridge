@@ -1,6 +1,18 @@
 extern void propagate_noise_cal();
 extern void start_noise_cal();
 
+void reverse_leds(CRGB arr[], uint16_t size) {
+  uint16_t start = 0;
+  uint16_t end = size - 1;
+  while (start < end) {
+    CRGB temp = arr[start];
+    arr[start] = arr[end];
+    arr[end] = temp;
+    start++;
+    end--;
+  }
+}
+
 void run_sweet_spot() {
   static float sweet_spot_brightness = 0.0; // init to zero for first fade in
 
@@ -79,6 +91,11 @@ void show_leds() {
       }
     }
   }
+
+  if(CONFIG.REVERSE_ORDER == true){
+    reverse_leds(leds_out, CONFIG.LED_COUNT);
+  }
+  
   // PHOTONS knob is squared and applied here:
   FastLED.setBrightness((255 * MASTER_BRIGHTNESS) * (CONFIG.PHOTONS * CONFIG.PHOTONS) * silent_scale);
   FastLED.show();
@@ -339,7 +356,7 @@ void run_transition_fade() {
         mode_destination = -1;
       }
     }
-    
+
     if (noise_transition_queued == true) { // If transition for NOISE button press
       noise_transition_queued = false;
       // start noise cal

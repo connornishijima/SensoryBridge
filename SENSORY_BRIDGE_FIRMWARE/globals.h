@@ -27,6 +27,7 @@ struct conf {
   int32_t  DC_OFFSET;
   uint8_t  CHROMAGRAM_RANGE;
   bool     STANDBY_DIMMING;
+  bool     REVERSE_ORDER;
   bool     IS_MAIN_UNIT;
 
   uint32_t VERSION;
@@ -61,6 +62,7 @@ conf CONFIG = {
   0,                   // DC_OFFSET
   64,                  // CHROMAGRAM_RANGE
   true,                // STANDBY_DIMMING
+  false,               // REVERSE_ORDER
   false,               // IS_MAIN_UNIT
 
   FIRMWARE_VERSION,    // VERSION
