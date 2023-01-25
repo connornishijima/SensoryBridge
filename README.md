@@ -31,17 +31,17 @@ It has to be seen to be believed, *which the video demos below can help with:*
 
 **Easy controls provide quick access to changing the brightness, audio gain, and smoothing of the display!**
 
-## **KNOBS**
+# **KNOBS**
 
-### PHOTONS KNOB
+## PHOTONS KNOB
 
 Too bright? *Dim down the show* with the **PHOTONS** knob. The FastLED code in the firmware will use dithering to keep producing color nicely at lower brightness levels.
 
-### CHROMA KNOB
+## CHROMA KNOB
 
 Custom color or automated color based on the music's notation? Choose with the **CHROMA** knob, where turning it all the way to the top enables automated color changes.
 
-### MOOD KNOB
+## MOOD KNOB
 
 This knob is special. **MOOD** controls *how quickly your LEDs will react to changes in pitch and volume!* A low "mood" will be very soft and gradual, only showing things like the underlying chord progression of a song, whereas a *high* "mood" will be extremely reactive, and can be a little too flashy for some people's liking. Luckily, you can blend the value to anywhere between those two extremes whenever you want to find what look you prefer!
 
@@ -49,47 +49,47 @@ This knob is special. **MOOD** controls *how quickly your LEDs will react to cha
 
 ![KNOBS](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/16.jpg?raw=true)
 
-## **BUTTONS**
+# **BUTTONS**
 
-### NOISE BUTTON
+## NOISE BUTTON
 
 Running the A/C? Is the washing machine suddenly on the spin cycle? Don't worry, just pause the music for a moment and press the **NOISE BUTTON** to run a 3-second calibration to *automagically* have noisy background ambience removed from your light show.
 
-### MODE BUTTON
+## MODE BUTTON
 
 Sensory Bridge currently has 6 built-in light show modes that you can cycle through:
 
-#### "Spectrogram Mode"
+### "Spectrogram Mode"
 
 This is the default show seen in the videos, based on Discrete Fourier Transform data. Each octave of notation shown on the display has a spectrum of colors for the individual notes, which are lit in sync with your music!
 
-#### "Chromagram Mode"
+### "Chromagram Mode"
 
 Similar to Spectrogram Mode, but all octaves of notes are rolled into one! Best with the **MOOD** knob at a low to medium setting.
 
-#### "Bloom Mode"
+### "Bloom Mode"
 
 This mode differs from the others. The intensity of the audio is shown in the center of the LED strip, and is diffused outward in a non-linear fashion as time passes, leading to a 2001 "Stargate Sequence" effect!. Color is derived from the notes your music is playing.
 
-#### "Bloom Mode" (Faster)
+### "Bloom Mode" (Faster)
 
 Same as above, but double the speed for when you're partying hard!
 
-#### "VU Meter Mode"
+### "VU Meter Mode"
 
 It's a classic! A bouncing bar graph represents the current loudness of the music.
 
-#### "VU Meter Mode (Dot)"
+### "VU Meter Mode (Dot)"
 
 Same as above, but represented with a dot instead of a bar, staying a constant brightness.
 
-### ***MORE MODES WILL BE RELEASED IN FUTURE FIRMWARE UPDATES!***
+## ***MORE MODES WILL BE RELEASED IN FUTURE FIRMWARE UPDATES!***
 
 # 
 
 ![SWEET SPOT](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/3.jpg?raw=true)
 
-## **SWEET SPOT**
+# **SWEET SPOT**
 
 At the front of the base unit are three LEDs, which indicate if you've set your Boost knob correctly for the music volume and distance! Tune the Boost until the center (green) LED is lit up during an average loudness level of your music. Once set, it shouldn't need to be changed between songs!
 
@@ -121,7 +121,7 @@ For $50, you'll receive a ***fully assembled Sensory Bridge***, with the latest 
 
 # EXTRAS YOU **MIGHT NEED:**
 
-### **PAY CLOSE ATTENTION TO THIS SECTION!**
+## **PAY CLOSE ATTENTION TO THIS SECTION!**
 
 To save on redundant materials you might already own, **your Sensory Bridge does *not* come with the following items:**
 
@@ -140,29 +140,15 @@ Sensory Bridge is going to undergo some upgrades in the following months! You'll
 
 **Currently planned features are:**
 
-## Manual Color Selection
-
-Currently, Sensory Bridge chooses colors for you based on musical data, but an upcoming firmware update will allow you to hold the MODE button and adjust the knobs to manually set hue, saturation, and the color shifting at the edges of notes.
-
 ## WiFi Features
 
 Planned for Q1 2023 is a mobile / web app for iOS and Android that will allow users to remotely tweak their display from the couch! This will provide a way to adjust dozens of settings that otherwise couldn't be accessed through just two physical buttons.
 
-## Syncing Multiple Units Together
-
-A feature also based in WiFi capabilities, this will allow you to have two Sensory Bridge units that each study their own audio (think: placing them on top of stereo speakers), but synchronize color and all other settings between them in realtime, via an ad-hoc network between units.
-
 ## More Lightshow Modes
 
-Currently in development is a system of determining and synchronizing to the BPM of the playing music. Combining this data with the FFT could mean deducing time signatures, along with musical keys and chord progressions - just another avenue for providing an immersive show!
+Currently in development is a system of determining and synchronizing to the BPM of the playing music. Combining this data with the GDFT could mean deducing time signatures, along with musical keys and chord progressions - just another avenue for providing an immersive show!
 
 ![AUX PORT](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/15.jpg?raw=true)
-
-## Support For "DotStar" LEDs
-
-The screw terminal and accessory port also include a "CLOCK" line required for APA102 "DotStar"-type LEDs. By default, the firmware does not use the CLK line, and this ability must be enabled by modifying [system.h](https://github.com/connornishijima/SensoryBridge/blob/main/system.h) in the firmware.
-
-In the near future, holding the "MODE" button down while plugging in Sensory Bridge will switch between LED types.
 
 ## Support For Line-In Audio
 
