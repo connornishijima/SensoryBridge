@@ -180,6 +180,9 @@ void dump_info() {
   USBSerial.print("CONFIG.IS_MAIN_UNIT: ");
   USBSerial.println(CONFIG.IS_MAIN_UNIT);
 
+  USBSerial.print("CONFIG.MAX_CURRENT_MA: ");
+  USBSerial.println(CONFIG.MAX_CURRENT_MA);
+
   USBSerial.print("CONFIG.VERSION: ");
   USBSerial.println(CONFIG.VERSION);
 
@@ -293,7 +296,7 @@ void parse_command(char* command_buf) {
     USBSerial.println("          magnitude_floor=[int or 'default'] | Sets minimum magnitude a frequency bin must have to contribute the show");
     USBSerial.println("           max_block_size=[int or 'default'] | Sets the maximum number of samples used to compute frequency data");
     USBSerial.println("        samples_per_chunk=[int or 'default'] | Sets the number of samples collected every frame");
-    USBSerial.println("                   gain=[float or 'default'] | Sets the scaling of spectrogram data (>0.0 is brighter, <0.0 is darker)");
+    USBSerial.println("                   gain=[float or 'default'] | Sets the scaling of audio data (>1.0 is more sensitive, <1.0 is less sensitive)");
     USBSerial.println("         boot_animation=[true/false/default] | Enable or disable the boot animation");
     USBSerial.println("                  set_main_unit=[true/false] | Sets if this unit is MAIN or not for SensorySync");
     USBSerial.println("           sweet_spot_min=[int or 'default'] | Sets the minimum amplitude to be inside the 'Sweet Spot'");
@@ -302,6 +305,7 @@ void parse_command(char* command_buf) {
     USBSerial.println("                                               spectrogram should be considered in chromagram sums");
     USBSerial.println("        standby_dimming=[true/false/default] | Toggle dimming during detected silence");
     USBSerial.println("                      bass_mode=[true/false] | Toggle bass-mode, which alters note_offset and chromagram_range for bass-y tunes");
+    USBSerial.println("           max_current_ma=[int or 'default'] | Sets the maximum current FastLED will attempt to limit the LED consumption to");
     tx_end();
   }
 
@@ -713,9 +717,11 @@ void parse_command(char* command_buf) {
       bool good = false;
       if (strcmp(command_data, "neopixel") == 0) {
         CONFIG.LED_TYPE = LED_NEOPIXEL;
+        CONFIG.LED_COLOR_ORDER = GRB;
         good = true;
       } else if (strcmp(command_data, "dotstar") == 0) {
         CONFIG.LED_TYPE = LED_DOTSTAR;
+        CONFIG.LED_COLOR_ORDER = BGR;
         good = true;
       } else {
         bad_command(command_type, command_data);
@@ -982,7 +988,7 @@ void parse_command(char* command_buf) {
       bool good = false;
       if (strcmp(command_data, "true") == 0) {
         CONFIG.NOTE_OFFSET = 0;
-        CONFIG.CHROMAGRAM_RANGE = 18;
+        CONFIG.CHROMAGRAM_RANGE = 24;
         good = true;
       } else if (strcmp(command_data, "false") == 0) {
         CONFIG.NOTE_OFFSET = CONFIG_DEFAULTS.NOTE_OFFSET;
@@ -1025,6 +1031,24 @@ void parse_command(char* command_buf) {
         USBSerial.println(CONFIG.REVERSE_ORDER);
         tx_end();
       }
+    }
+
+    // Set max LED current ----------------------------
+    else if (strcmp(command_type, "max_current_ma") == 0) {
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.MAX_CURRENT_MA = CONFIG_DEFAULTS.MAX_CURRENT_MA;
+      }
+      else {
+        CONFIG.MAX_CURRENT_MA = constrain(atof(command_data), 0, uint32_t(-1));
+      }
+
+      FastLED.setMaxPowerInVoltsAndMilliamps(5.0, CONFIG.MAX_CURRENT_MA);
+
+      save_config_delayed();
+      tx_begin();
+      USBSerial.print("CONFIG.MAX_CURRENT_MA: ");
+      USBSerial.println(CONFIG.MAX_CURRENT_MA);
+      tx_end();
     }
 
     // Stream a given value over Serial -----------------

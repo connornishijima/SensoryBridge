@@ -300,8 +300,8 @@ void light_mode_vu_dot() {
 
   led_pos_smooth = led_pos * (smoothing) + led_pos_smooth * (1.0 - smoothing);
 
-  if (led_pos_smooth > 126) {
-    led_pos_smooth = 126;
+  if (led_pos_smooth > NATIVE_RESOLUTION-2) {
+    led_pos_smooth = NATIVE_RESOLUTION-2;
   }
   else if (led_pos_smooth < 0) {
     led_pos_smooth = 0;

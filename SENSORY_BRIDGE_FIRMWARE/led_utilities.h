@@ -130,7 +130,7 @@ void init_leds() {
     }
   }
 
-  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, 2000);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, CONFIG.MAX_CURRENT_MA);
 
   for (uint8_t x = 0; x < NATIVE_RESOLUTION; x++) {
     leds[x] = CRGB(0, 0, 0);

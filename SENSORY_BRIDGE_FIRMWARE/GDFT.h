@@ -136,8 +136,8 @@ void IRAM_ATTR process_GDFT() {
     }
 
     mag_targets[i] = magnitudes[i];
-    if (mag_targets[i] * (1.0 - CONFIG.GAIN) > max_mags[frequencies[i].zone]) {
-      max_mags[frequencies[i].zone] = mag_targets[i] * (1.0 - CONFIG.GAIN);
+    if (mag_targets[i] > max_mags[frequencies[i].zone]) {
+      max_mags[frequencies[i].zone] = mag_targets[i];
     }
   }
 
@@ -263,6 +263,11 @@ void IRAM_ATTR process_GDFT() {
     // Smooth spectrogram changes with MOOD knob value (Exp. Avg. smoothing)
     mag_float = mag_float * (1.0 - smoothing_exp_average) + mag_float_last[i] * smoothing_exp_average;
     mag_float_last[i] = mag_float;
+
+    mag_float *= CONFIG.GAIN;
+    if(mag_float > 1.0){
+      mag_float = 1.0;
+    }
 
     note_spectrogram[i] = mag_float;                                          // This array is the current value
     spectrogram_history[spectrogram_history_index][i] = note_spectrogram[i];  // This array is the value's history

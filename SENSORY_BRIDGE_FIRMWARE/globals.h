@@ -29,6 +29,7 @@ struct conf {
   bool     STANDBY_DIMMING;
   bool     REVERSE_ORDER;
   bool     IS_MAIN_UNIT;
+  uint32_t MAX_CURRENT_MA;
 
   uint32_t VERSION;
 };
@@ -55,7 +56,7 @@ conf CONFIG = {
   true,                // LED_INTERPOLATION
   1600,                // MAX_BLOCK_SIZE
   256,                 // SAMPLES_PER_CHUNK
-  0.0,                 // GAIN
+  1.0,                 // GAIN
   true,                // BOOT_ANIMATION
   750,                 // SWEET_SPOT_MIN_LEVEL
   30000,               // SWEET_SPOT_MAX_LEVEL
@@ -64,6 +65,7 @@ conf CONFIG = {
   true,                // STANDBY_DIMMING
   false,               // REVERSE_ORDER
   false,               // IS_MAIN_UNIT
+  1500,                // MAX_CURRENT_MA
 
   FIRMWARE_VERSION,    // VERSION
 };

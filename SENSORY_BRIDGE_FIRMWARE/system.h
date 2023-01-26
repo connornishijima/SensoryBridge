@@ -269,9 +269,8 @@ void init_system() {
   set_mode_name(1, "CHROMAGRAM");
   set_mode_name(2, "BLOOM");
   set_mode_name(3, "BLOOM (FAST)");
-  set_mode_name(4, "WAVEFORM");
-  set_mode_name(5, "VU");
-  set_mode_name(6, "VU (DOT)");
+  set_mode_name(4, "VU");
+  set_mode_name(5, "VU (DOT)");
 
   init_serial(SERIAL_BAUD);
   init_sweet_spot();

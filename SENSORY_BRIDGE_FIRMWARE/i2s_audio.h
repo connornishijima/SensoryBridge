@@ -72,9 +72,9 @@ void acquire_sample_chunk(uint32_t t_now) {
   for (uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++) {
     int32_t sample = (i2s_samples_raw[i] * 0.000512) + 56000 - 5120;
 
-    sample = sample >> 2;
+    sample = sample >> 2; // Helps prevent overflow in fixed-point math coming up
 
-    if (sample > 32767) {  //clipping
+    if (sample > 32767) { // clipping
       sample = 32767;
     } else if (sample < -32767) {
       sample = -32767;
@@ -83,7 +83,7 @@ void acquire_sample_chunk(uint32_t t_now) {
     waveform[i] = sample - CONFIG.DC_OFFSET;
     waveform_history[waveform_history_index][i] = waveform[i];
 
-    int16_t sample_abs = abs(sample);
+    uint32_t sample_abs = abs(sample) * CONFIG.GAIN;
     if (sample_abs > max_waveform_val_raw) {
       max_waveform_val_raw = sample_abs;
     }
@@ -112,7 +112,7 @@ void acquire_sample_chunk(uint32_t t_now) {
     }
   }
   else {
-    max_waveform_val = max_waveform_val_raw - (CONFIG.SWEET_SPOT_MIN_LEVEL);
+    max_waveform_val = (max_waveform_val_raw - (CONFIG.SWEET_SPOT_MIN_LEVEL));
     
     if (max_waveform_val > max_waveform_val_follower) {
       float delta = max_waveform_val - max_waveform_val_follower;
@@ -120,7 +120,7 @@ void acquire_sample_chunk(uint32_t t_now) {
     }
     else if (max_waveform_val < max_waveform_val_follower) {
       float delta = max_waveform_val_follower - max_waveform_val;
-      max_waveform_val_follower -= delta * 0.0025;
+      max_waveform_val_follower -= delta * 0.005;
 
       if (max_waveform_val_follower < CONFIG.SWEET_SPOT_MIN_LEVEL) {
         max_waveform_val_follower = CONFIG.SWEET_SPOT_MIN_LEVEL;

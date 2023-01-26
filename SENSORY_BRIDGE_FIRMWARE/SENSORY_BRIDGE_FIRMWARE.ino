@@ -50,7 +50,7 @@
 
   ---------------------------------------------------------------------*/
 
-#define FIRMWARE_VERSION 30000  // Try "V" on the Serial port for this!
+#define FIRMWARE_VERSION 30001  // Try "V" on the Serial port for this!
 //                       Mm P     M = Major version, m = Minor version, P = Patch version
 //                                (i.e 3.5.4 would be 30504)
 
