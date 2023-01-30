@@ -88,29 +88,10 @@ void load_config() {
       config_buffer[i] = file.read();
     }
 
-    // Temporary buffer is used to compare saved config version with this firmware versions' defaults.
-    // If a leftover config file version is a mismatch with the current firmware version, the config
-    // and noise_cal files need to be factory reset, to avoid reading potentially corrupt values
-    conf CONFIG_TEMP;
-    memcpy(&CONFIG_TEMP, config_buffer, sizeof(CONFIG_TEMP));
+    memcpy(&CONFIG, config_buffer, sizeof(CONFIG));
 
     if (debug_mode) {
-      USBSerial.print("STORED VERSION IS: ");
-      USBSerial.println(CONFIG_TEMP.VERSION);
-
-      USBSerial.print("CURRENT VERSION IS: ");
-      USBSerial.println(CONFIG_DEFAULTS.VERSION);
-    }
-
-    if (CONFIG_TEMP.VERSION != CONFIG_DEFAULTS.VERSION) {
-      if(debug_mode){USBSerial.println("STORED CONFIG FILE IS OUTDATED!");}
-      //USBSerial.println("Factory resetting now to avoid potentially incompatible data!");
-      //save_backup_config();
-      //queue_factory_reset = true;
-    }
-    else {
-      memcpy(&CONFIG, &CONFIG_TEMP, sizeof(CONFIG_TEMP));
-      if(debug_mode){USBSerial.println("READ CONFIG SUCCESSFULLY");}
+      USBSerial.println("READ CONFIG SUCCESSFULLY");
     }
   }
   file.close();
@@ -122,10 +103,14 @@ void load_config() {
 
 // Save noise calibration to LittleFS
 void save_ambient_noise_calibration() {
-  if(debug_mode){USBSerial.print("SAVING AMBIENT_NOISE PROFILE... ");}
+  if (debug_mode) {
+    USBSerial.print("SAVING AMBIENT_NOISE PROFILE... ");
+  }
   File file = LittleFS.open("/noise_cal.bin", FILE_WRITE);
   if (!file) {
-    if(debug_mode){USBSerial.println("Failed to open file for writing!");}
+    if (debug_mode) {
+      USBSerial.println("Failed to open file for writing!");
+    }
     return;
   }
 
@@ -144,15 +129,21 @@ void save_ambient_noise_calibration() {
   }
 
   file.close();
-  if(debug_mode){USBSerial.println("SAVE COMPLETE");}
+  if (debug_mode) {
+    USBSerial.println("SAVE COMPLETE");
+  }
 }
 
 // Load noise calibration from LittleFS
 void load_ambient_noise_calibration() {
-  if(debug_mode){USBSerial.print("LOADING AMBIENT_NOISE PROFILE... ");}
+  if (debug_mode) {
+    USBSerial.print("LOADING AMBIENT_NOISE PROFILE... ");
+  }
   File file = LittleFS.open("/noise_cal.bin", FILE_READ);
   if (!file) {
-    if(debug_mode){USBSerial.println("Failed to open file for reading!");}
+    if (debug_mode) {
+      USBSerial.println("Failed to open file for reading!");
+    }
     return;
   }
 
@@ -169,7 +160,9 @@ void load_ambient_noise_calibration() {
   }
 
   file.close();
-  if(debug_mode){USBSerial.println("LOAD COMPLETE");}
+  if (debug_mode) {
+    USBSerial.println("LOAD COMPLETE");
+  }
 }
 
 // Initialize LittleFS

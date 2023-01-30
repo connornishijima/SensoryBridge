@@ -30,8 +30,7 @@ struct conf {
   bool     REVERSE_ORDER;
   bool     IS_MAIN_UNIT;
   uint32_t MAX_CURRENT_MA;
-
-  uint32_t VERSION;
+  bool     TEMPORAL_DITHERING;
 };
 
 // ------------------------------------------------------------
@@ -49,13 +48,13 @@ conf CONFIG = {
   DEFAULT_SAMPLE_RATE, // SAMPLE_RATE
   12,                  // NOTE_OFFSET
   1,                   // SQUARE_ITER
-  1000,                // MAGNITUDE_FLOOR
+  20,                  // MAGNITUDE_FLOOR
   LED_NEOPIXEL,        // LED_TYPE
   128,                 // LED_COUNT
   GRB,                 // LED_COLOR_ORDER
   true,                // LED_INTERPOLATION
-  1600,                // MAX_BLOCK_SIZE
-  256,                 // SAMPLES_PER_CHUNK
+  1500,                // MAX_BLOCK_SIZE
+  128,                 // SAMPLES_PER_CHUNK
   1.0,                 // GAIN
   true,                // BOOT_ANIMATION
   750,                 // SWEET_SPOT_MIN_LEVEL
@@ -66,8 +65,7 @@ conf CONFIG = {
   false,               // REVERSE_ORDER
   false,               // IS_MAIN_UNIT
   1500,                // MAX_CURRENT_MA
-
-  FIRMWARE_VERSION,    // VERSION
+  true,                // TEMPORAL_DITHERING
 };
 
 conf CONFIG_DEFAULTS; // Used for resetting to default values at runtime
@@ -93,7 +91,7 @@ freq frequencies[NUM_FREQS];
 // ------------------------------------------------------------
 // Hann window lookup table (generated in system.h) -----------
 
-int16_t window_lookup[2048] = { 0 };
+float window_lookup[4096] = { 0 };
 
 // ------------------------------------------------------------
 // A-weighting lookup table (parsed in system.h) --------------
@@ -171,13 +169,18 @@ CRGB leds_fade[128];
 
 CRGB *leds_out;
 
+uint8_t dither_step = 0;
+bool led_thread_halt = false;
+TaskHandle_t led_task;
+
 // ------------------------------------------------------------
 // Benchmarking (system.h) ------------------------------------
 
 Ticker cpu_usage;
 volatile uint16_t function_id = 0;
 volatile uint16_t function_hits[32] = {0};
-float FPS = 0.0;
+float SYSTEM_FPS = 0.0;
+float LED_FPS    = 0.0;
 
 // ------------------------------------------------------------
 // SensorySync P2P network (p2p.h) ----------------------------

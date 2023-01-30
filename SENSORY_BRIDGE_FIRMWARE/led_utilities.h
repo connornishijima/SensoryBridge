@@ -69,6 +69,21 @@ CRGB lerp_led(float index, CRGB* led_array) {
 }
 
 void show_leds() {
+  dither_step++;
+  if (dither_step >= 8) {
+    dither_step = 0;
+  }
+
+  // This is only used to fade in when booting!
+  if (millis() >= 1000 && noise_transition_queued == false && mode_transition_queued == false) {
+    if (MASTER_BRIGHTNESS < 1.0) {
+      MASTER_BRIGHTNESS += 0.005;
+    }
+    if (MASTER_BRIGHTNESS > 1.0) {
+      MASTER_BRIGHTNESS = 1.00;
+    }
+  }
+
   if (CONFIG.LED_COUNT == NATIVE_RESOLUTION) {
     memcpy(leds_out, leds, sizeof(leds));
   } else {  // If not native resolution, use interpolation if enabled
@@ -92,13 +107,15 @@ void show_leds() {
     }
   }
 
-  if(CONFIG.REVERSE_ORDER == true){
+  if (CONFIG.REVERSE_ORDER == true) {
     reverse_leds(leds_out, CONFIG.LED_COUNT);
   }
-  
+
   // PHOTONS knob is squared and applied here:
   FastLED.setBrightness((255 * MASTER_BRIGHTNESS) * (CONFIG.PHOTONS * CONFIG.PHOTONS) * silent_scale);
+  FastLED.setDither(CONFIG.TEMPORAL_DITHERING);
   FastLED.show();
+  //USBSerial.println(MASTER_BRIGHTNESS);
 }
 
 void init_leds() {
@@ -143,15 +160,21 @@ void init_leds() {
   USBSerial.println(leds_started == true ? PASS : FAIL);
 }
 
+void save_leds_to_aux() {
+  memcpy(leds_aux, leds, sizeof(leds));
+}
+
+void load_leds_from_aux() {
+  memcpy(leds, leds_aux, sizeof(leds));
+}
+
 void save_leds_to_last() {
   memcpy(leds_last, leds, sizeof(leds));
 }
 
-
 void load_leds_from_last() {
   memcpy(leds, leds_last, sizeof(leds));
 }
-
 
 void save_leds_to_temp() {
   memcpy(leds_temp, leds, sizeof(leds));
@@ -163,6 +186,7 @@ void load_leds_from_temp() {
 }
 
 void blocking_flash(CRGB col) {
+  led_thread_halt = true;
   for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
     leds[i] = CRGB(0, 0, 0);
   }
@@ -173,14 +197,16 @@ void blocking_flash(CRGB col) {
       leds[i] = col;
     }
     show_leds();
-    delay(150);
+    FastLED.delay(150);
 
     for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
       leds[i] = CRGB(0, 0, 0);
     }
     show_leds();
-    delay(150);
+    FastLED.delay(150);
   }
+
+  led_thread_halt = false;
 }
 
 void clear_all_led_buffers() {
@@ -259,7 +285,7 @@ void intro_animation() {
       leds[i] = out_col;
     }
     show_leds();
-    delay(4);
+    FastLED.delay(3);
   }
 
   clear_all_led_buffers();
@@ -326,7 +352,7 @@ void intro_animation() {
       }
     }
     show_leds();
-    delay(5);
+    FastLED.delay(6);
   }
   MASTER_BRIGHTNESS = 0.0;
   ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   0);
@@ -336,7 +362,7 @@ void intro_animation() {
 
 void run_transition_fade() {
   if (MASTER_BRIGHTNESS > 0.0) {
-    MASTER_BRIGHTNESS -= 0.05;
+    MASTER_BRIGHTNESS -= 0.02;
 
     if (MASTER_BRIGHTNESS < 0.0) {
       MASTER_BRIGHTNESS = 0.0;
@@ -406,5 +432,34 @@ void fade_top_half(bool shifted = false) {
     leds[(NATIVE_RESOLUTION - 1 - i) + shift].r *= fade;
     leds[(NATIVE_RESOLUTION - 1 - i) + shift].g *= fade;
     leds[(NATIVE_RESOLUTION - 1 - i) + shift].b *= fade;
+  }
+}
+
+// Draws anti-aliased 1-D lines using Xiaolin Wu's algorithm onto a CRGB array
+// Start and end positions are floating point for subpixel positioning
+void draw_line(CRGB* led_array, CRGB line_color, float start_pos, float end_pos) {
+  // Get the start and end positions as integers
+  int16_t x0 = max((int)start_pos, 0);
+  int16_t x1 = min((int)end_pos, NATIVE_RESOLUTION - 1);
+  float gradient = (float)(line_color.r - line_color.b) / (x1 - x0);
+
+  // Determine whether the line is going left or right
+  if (x0 > x1) {
+    // If the line is going left, swap the start and end positions
+    int16_t temp = x0;
+    x0 = x1;
+    x1 = temp;
+  }
+
+  // Iterate over the pixels of the line
+  for (uint16_t x = x0; x <= x1; x++) {
+    float t = (x - x0) / (float)(x1 - x0);
+    int16_t y = (int16_t)(line_color.b + gradient * (x - x0));
+    // determine the coverage of the current pixel
+    uint16_t coverage = (uint16_t)((1 - t) * 8);
+
+    // Blend the line color with the background color
+    CRGB blended_color = blend(line_color, led_array[x], coverage);
+    led_array[x] = blended_color;
   }
 }

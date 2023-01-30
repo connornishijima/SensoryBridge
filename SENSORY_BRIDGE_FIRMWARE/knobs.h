@@ -94,16 +94,6 @@ void check_knobs(uint32_t t_now) {
     chromatic_mode = true;
   }
 
-  // This is only used to fade in when booting!
-  if(t_now >= 1000 && noise_transition_queued == false && mode_transition_queued == false){
-    if(MASTER_BRIGHTNESS < 1.0){
-      MASTER_BRIGHTNESS += 0.01;
-    }
-    if(MASTER_BRIGHTNESS > 1.0){
-      MASTER_BRIGHTNESS = 1.00;
-    }
-  }
-
   // Mood knob processing
   float smoothing_top_half = (CONFIG.MOOD - 0.5);
   if (smoothing_top_half < 0.0) {

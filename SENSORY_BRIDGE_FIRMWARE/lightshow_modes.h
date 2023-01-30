@@ -3,28 +3,40 @@ void light_mode_gdft() {
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {  // 64 freqs
     float bin = note_spectrogram_smooth[i];
     for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
-      bin = bin * bin;
+      bin = (bin * bin);
     }
-    uint16_t led_brightness = 255 * bin;
+
+    float    led_brightness_raw = 254 * bin; // -1 for temporal dithering below
+    uint16_t led_brightness     = led_brightness_raw;
+    float    fract              = led_brightness_raw - led_brightness;
+
+    if (CONFIG.TEMPORAL_DITHERING == true) {
+      if (fract >= dither_table[dither_step]) {
+        led_brightness += 1;
+      }
+    }
 
     brightness_levels[i] = led_brightness;  // Can use this value later if needed
 
-    float led_hue;
+    float led_hue_a;
+    float led_hue_b;
     if (chromatic_mode == true) {
-      led_hue = 21.33333333 * i;  // Makes hue completely cycle once per octave
+      led_hue_a = 21.33333333 * i;  // Makes hue completely cycle once per octave
+      led_hue_b = led_hue_a + 10.66666666;
     }
     else {
-      led_hue = 255 * chroma_val;  // User color selection
+      led_hue_a = 255 * chroma_val;  // User color selection
+      led_hue_b = led_hue_a;
     }
 
     CRGB col1 = CRGB(0, 0, 0);
     hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
-      CHSV(led_hue, 255, brightness_levels[i]),
+      CHSV(led_hue_a, 255, brightness_levels[i]),
       col1);
 
     CRGB col2 = CRGB(0, 0, 0);
     hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
-      CHSV(led_hue + 10.66666666, 255, brightness_levels[i]),
+      CHSV(led_hue_b, 255, brightness_levels[i]),
       col2);
 
     leds[i * 2 + 0] = col1;  // Two LEDs at a time so that mirror mode works gracefully
@@ -42,6 +54,16 @@ void light_mode_gdft_chromagram() {
       bin = bin * bin;
     }
 
+    float    led_brightness_raw = 254 * bin; // -1 for temporal dithering below
+    uint16_t led_brightness     = led_brightness_raw;
+    float    fract              = led_brightness_raw - led_brightness;
+
+    if (CONFIG.TEMPORAL_DITHERING == true) {
+      if (fract >= dither_table[dither_step]) {
+        led_brightness += 1;
+      }
+    }
+
     float led_hue;
     if (chromatic_mode == true) {
       led_hue = 255 * prog;
@@ -50,7 +72,10 @@ void light_mode_gdft_chromagram() {
       led_hue = 255 * chroma_val;
     }
 
-    leds[i] = CHSV(led_hue, 255, 255 * bin);
+    hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
+      CHSV(led_hue, 255, led_brightness),
+      leds[i]
+    );
   }
 }
 
@@ -60,69 +85,76 @@ void light_mode_bloom(bool fast_scroll) {
 
   iter++;
 
-  CRGB sum_color = CRGB(0, 0, 0);
-  float brightness_sum = 0.0;
-  for (uint8_t i = 0; i < 12; i++) {
-    float prog = i / float(12);
+  if (bitRead(iter, 0) == 0) {
+    CRGB sum_color = CRGB(0, 0, 0);
+    float brightness_sum = 0.0;
+    for (uint8_t i = 0; i < 12; i++) {
+      float prog = i / float(12);
 
-    float bin = note_chromagram[i]; // * (1.0 / chromagram_max_val);
+      float bin = note_chromagram[i]; // * (1.0 / chromagram_max_val);
 
-    float bright = bin;
-    for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
-      bright *= bright;
+      float bright = bin;
+      for (uint8_t s = 0; s < CONFIG.SQUARE_ITER; s++) {
+        bright *= bright;
+      }
+      bright *= 1.5;
+      if (bright > 1.0) {
+        bright = 1.0;
+      }
+
+      bright *= led_share;
+
+      CRGB out_col;
+      if (chromatic_mode == true) {
+        hsv2rgb_spectrum(
+          CHSV(255 * prog, 255, bright),
+          out_col);
+      }
+      else {
+        brightness_sum += bright;
+      }
+
+      sum_color += out_col;
     }
-    bright *= 1.5;
-    if (bright > 1.0) {
-      bright = 1.0;
-    }
 
-    bright *= led_share;
-
-    CRGB out_col;
-    if (chromatic_mode == true) {
+    if (chromatic_mode == false) {
       hsv2rgb_spectrum(
-        CHSV(255 * prog, 255, bright),
-        out_col);
-    }
-    else {
-      brightness_sum += bright;
+        CHSV(255 * chroma_val, 255, brightness_sum),
+        sum_color);
     }
 
-    sum_color += out_col;
-  }
+    if (fast_scroll == true) { // Fast mode scrolls two LEDs at a time
+      for (uint8_t i = 0; i < NATIVE_RESOLUTION - 2; i++) {
+        leds_temp[(NATIVE_RESOLUTION - 1) - i] = leds_last[(NATIVE_RESOLUTION - 1) - i - 2];
+      }
 
-  if (chromatic_mode == false) {
-    hsv2rgb_spectrum(
-      CHSV(255 * chroma_val, 255, brightness_sum),
-      sum_color);
-  }
+      leds_temp[0] = sum_color; // New information goes here
+      leds_temp[1] = sum_color; // New information goes here
+    }
+    else { // Slow mode only scrolls one LED at a time
+      for (uint8_t i = 0; i < NATIVE_RESOLUTION - 1; i++) {
+        leds_temp[(NATIVE_RESOLUTION - 1) - i] = leds_last[(NATIVE_RESOLUTION - 1) - i - 1];
+      }
 
-  if (fast_scroll == true) { // Fast mode scrolls two LEDs at a time
-    for (uint8_t i = 0; i < NATIVE_RESOLUTION - 2; i++) {
-      leds_temp[(NATIVE_RESOLUTION - 1) - i] = leds_last[(NATIVE_RESOLUTION - 1) - i - 2];
+      leds_temp[0] = sum_color; // New information goes here
     }
 
-    leds_temp[0] = sum_color; // New information goes here
-    leds_temp[1] = sum_color; // New information goes here
+    load_leds_from_temp();
+    save_leds_to_last();
+
+    //fadeToBlackBy(leds, 128, 255-255*waveform_peak_scaled);
+
+    distort_logarithmic();
+    //distort_exponential();
+
+    fade_top_half(CONFIG.MIRROR_ENABLED); // fade at different location depending if mirroring is enabled
+    increase_saturation(32);
+
+    save_leds_to_aux();
   }
-  else { // Slow mode only scrolls one LED at a time
-    for (uint8_t i = 0; i < NATIVE_RESOLUTION - 1; i++) {
-      leds_temp[(NATIVE_RESOLUTION - 1) - i] = leds_last[(NATIVE_RESOLUTION - 1) - i - 1];
-    }
-
-    leds_temp[0] = sum_color; // New information goes here
+  else{
+    load_leds_from_aux();
   }
-
-  load_leds_from_temp();
-  save_leds_to_last();
-
-  //fadeToBlackBy(leds, 128, 255-255*waveform_peak_scaled);
-
-  distort_logarithmic();
-  //distort_exponential();
-
-  fade_top_half(CONFIG.MIRROR_ENABLED); // fade at different location depending if mirroring is enabled
-  increase_saturation(32);
 }
 
 void light_mode_waveform() {
@@ -170,9 +202,9 @@ void light_mode_waveform() {
   }
 
   /*
-  CHSV hsv = rgb2hsv_approximate(sum_color);
-  hsv.s = qadd8(hsv.s, 64);
-  sum_color = hsv;
+    CHSV hsv = rgb2hsv_approximate(sum_color);
+    hsv.s = qadd8(hsv.s, 64);
+    sum_color = hsv;
   */
 
   float sum_color_float[3] = {float(sum_color.r), float(sum_color.g), float(sum_color.b)};
@@ -231,7 +263,7 @@ void light_mode_vu() {
   const float led_share = 255 / float(12);
   static float sum_color_last[3] = {0, 0, 0};
 
-  float smoothing = (0.1 + CONFIG.MOOD * 0.9) * 0.25;
+  float smoothing = (0.025 + CONFIG.MOOD * 0.975) * 0.25;
   float led_pos = waveform_peak_scaled * (NATIVE_RESOLUTION - 1);
   static float led_pos_smooth = 0.0;
 
@@ -244,6 +276,9 @@ void light_mode_vu() {
     led_pos_smooth = 0;
   }
 
+  uint16_t led_pos_smooth_whole = led_pos_smooth;
+  float fract = led_pos_smooth - led_pos_smooth_whole;
+
   CRGB sum_color = CRGB(0, 0, 0);
   if (chromatic_mode == true) {
     for (uint8_t c = 0; c < 12; c++) {
@@ -279,11 +314,18 @@ void light_mode_vu() {
 
   for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
     leds[i] = CRGB(0, 0, 0);
-    if (i <= led_pos_smooth) {
+    if (i < led_pos_smooth) {
       leds[i] = CRGB(
                   sum_color_float[0],
                   sum_color_float[1],
                   sum_color_float[2]
+                );
+    }
+    else if (i == led_pos_smooth) {
+      leds[i] = CRGB(
+                  sum_color_float[0] * fract,
+                  sum_color_float[1] * fract,
+                  sum_color_float[2] * fract
                 );
     }
   }
@@ -294,14 +336,14 @@ void light_mode_vu_dot() {
   static float sum_color_last[3] = {0, 0, 0};
   static float led_pos_last = 0;
 
-  float smoothing = (0.1 + CONFIG.MOOD * 0.9) * 0.25;
+  float smoothing = (0.025 + CONFIG.MOOD * 0.975) * 0.25;
   float led_pos = waveform_peak_scaled * (NATIVE_RESOLUTION - 1);
   static float led_pos_smooth = 0.0;
 
   led_pos_smooth = led_pos * (smoothing) + led_pos_smooth * (1.0 - smoothing);
 
-  if (led_pos_smooth > NATIVE_RESOLUTION-2) {
-    led_pos_smooth = NATIVE_RESOLUTION-2;
+  if (led_pos_smooth > NATIVE_RESOLUTION - 2) {
+    led_pos_smooth = NATIVE_RESOLUTION - 2;
   }
   else if (led_pos_smooth < 0) {
     led_pos_smooth = 0;
@@ -340,9 +382,7 @@ void light_mode_vu_dot() {
   sum_color_last[1] = sum_color_float[1];
   sum_color_last[2] = sum_color_float[2];
 
-  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
-    leds[i] = CRGB(0, 0, 0);
-  }
+  fadeToBlackBy(leds, NATIVE_RESOLUTION, 255);
 
   if (led_pos_last < led_pos_smooth) {
     for (uint8_t i = led_pos_last; i <= led_pos_smooth; i++) {

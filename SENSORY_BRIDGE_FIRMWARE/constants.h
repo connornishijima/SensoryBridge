@@ -1,8 +1,8 @@
 // AUDIO #######################################################
 
 #define SERIAL_BAUD 230400
-#define DEFAULT_SAMPLE_RATE 24400
-#define SAMPLE_HISTORY_LENGTH 2048
+#define DEFAULT_SAMPLE_RATE 12200
+#define SAMPLE_HISTORY_LENGTH 4096
 
 // Don't change this unless you're willing to do a lot of other work on the code :/
 #define NATIVE_RESOLUTION 128
@@ -45,6 +45,17 @@ const float notes[] = {
 #define SWEET_SPOT_RIGHT_PIN   9
 
 // OTHER #######################################################
+
+const float dither_table[8] = {
+  0.125,
+  0.250,
+  0.375,
+  0.500,
+  0.625,
+  0.750,
+  0.875,
+  1.000
+};
 
 #define SWEET_SPOT_LEFT_CHANNEL    0
 #define SWEET_SPOT_CENTER_CHANNEL  1

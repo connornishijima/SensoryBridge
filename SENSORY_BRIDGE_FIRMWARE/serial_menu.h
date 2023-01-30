@@ -10,7 +10,7 @@ extern void reboot(); // system.h
 
 void tx_begin(bool error = false) {
   if (error == false) {
-    USBSerial.println("sbr{{");
+    USBSerial.println("sbr{{"); 
   }
   else {
     USBSerial.println("sberr[[");
@@ -183,8 +183,8 @@ void dump_info() {
   USBSerial.print("CONFIG.MAX_CURRENT_MA: ");
   USBSerial.println(CONFIG.MAX_CURRENT_MA);
 
-  USBSerial.print("CONFIG.VERSION: ");
-  USBSerial.println(CONFIG.VERSION);
+  USBSerial.print("CONFIG.TEMPORAL_DITHERING: ");
+  USBSerial.println(CONFIG.TEMPORAL_DITHERING);
 
   USBSerial.print("MASTER_BRIGHTNESS: ");
   USBSerial.println(MASTER_BRIGHTNESS);
@@ -240,8 +240,11 @@ void dump_info() {
   USBSerial.print("mode_destination: ");
   USBSerial.println(mode_destination);
 
-  USBSerial.print("AVERAGE FPS: ");
-  USBSerial.println(FPS);
+  USBSerial.print("SYSTEM_FPS: ");
+  USBSerial.println(SYSTEM_FPS);
+
+  USBSerial.print("LED_FPS: ");
+  USBSerial.println(LED_FPS);
 }
 
 // This parses a completed command to decide how to handle it
@@ -272,7 +275,8 @@ void parse_command(char* command_buf) {
     USBSerial.println("                               get_main_unit | Print if this unit is set to MAIN for SensorySync");
     USBSerial.println("                                        dump | Print tons of useful variables in realtime");
     USBSerial.println("                                        stop | Stops the output of any enabled streams");
-    USBSerial.println("                                         fps | Return the average FPS");
+    USBSerial.println("                                         fps | Return the system FPS");
+    USBSerial.println("                                     led_fps | Return the LED FPS");
     USBSerial.println("                                     chip_id | Return the chip id (MAC) of the CPU");
     USBSerial.println("                                    get_mode | Get lightshow mode's ID (index)");
     USBSerial.println("                               get_num_modes | Return the number of modes available");
@@ -306,6 +310,7 @@ void parse_command(char* command_buf) {
     USBSerial.println("        standby_dimming=[true/false/default] | Toggle dimming during detected silence");
     USBSerial.println("                      bass_mode=[true/false] | Toggle bass-mode, which alters note_offset and chromagram_range for bass-y tunes");
     USBSerial.println("           max_current_ma=[int or 'default'] | Sets the maximum current FastLED will attempt to limit the LED consumption to");
+    USBSerial.println("     temporal_dithering=[true/false/default] | Toggle per-LED temporal dithering that simulates higher bit-depths");
     tx_end();
   }
 
@@ -465,8 +470,18 @@ void parse_command(char* command_buf) {
   else if (strcmp(command_buf, "fps") == 0) {
 
     tx_begin();
-    USBSerial.print("FPS: ");
-    USBSerial.println(FPS);
+    USBSerial.print("SYSTEM_FPS: ");
+    USBSerial.println(SYSTEM_FPS);
+    tx_end();
+
+  }
+  
+  // Print the average FPS ----------------------------------
+  else if (strcmp(command_buf, "led_fps") == 0) {
+
+    tx_begin();
+    USBSerial.print("LED_FPS: ");
+    USBSerial.println(LED_FPS);
     tx_end();
 
   }
@@ -474,7 +489,6 @@ void parse_command(char* command_buf) {
   // Print the knob values ----------------------------------
   else if (strcmp(command_buf, "get_knobs") == 0) {
 
-    tx_begin();
     USBSerial.print("{");
 
     USBSerial.print('"');
@@ -500,14 +514,12 @@ void parse_command(char* command_buf) {
     USBSerial.print(CONFIG.MOOD);
 
     USBSerial.println('}');
-    tx_end();
 
   }
 
   // Print the button values --------------------------------
   else if (strcmp(command_buf, "get_buttons") == 0) {
 
-    tx_begin();
     USBSerial.print("{");
 
     USBSerial.print('"');
@@ -525,7 +537,6 @@ void parse_command(char* command_buf) {
     USBSerial.print(digitalRead(mode_button.pin));
 
     USBSerial.println('}');
-    tx_end();
 
   }
 
@@ -775,6 +786,32 @@ void parse_command(char* command_buf) {
         tx_begin();
         USBSerial.print("CONFIG.LED_INTERPOLATION: ");
         USBSerial.println(CONFIG.LED_INTERPOLATION);
+        tx_end();
+      }
+    }
+
+    // Set LED Temporal Dithering ----------------------------
+    else if (strcmp(command_type, "temporal_dithering") == 0) {
+      bool good = false;
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.TEMPORAL_DITHERING = CONFIG_DEFAULTS.TEMPORAL_DITHERING;
+        good = true;
+      }
+      else if (strcmp(command_data, "true") == 0) {
+        CONFIG.TEMPORAL_DITHERING = true;
+        good = true;
+      } else if (strcmp(command_data, "false") == 0) {
+        CONFIG.TEMPORAL_DITHERING = false;
+        good = true;
+      } else {
+        bad_command(command_type, command_data);
+      }
+
+      if (good) {
+        save_config_delayed();
+        tx_begin();
+        USBSerial.print("CONFIG.TEMPORAL_DITHERING: ");
+        USBSerial.println(CONFIG.TEMPORAL_DITHERING);
         tx_end();
       }
     }

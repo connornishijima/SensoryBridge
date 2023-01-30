@@ -20,23 +20,16 @@ void bytes_to_hex_string(const byte bytes[4], char hex_string[9]) {
 }
 
 void print_chip_id() {
-  chip_id = ESP.getEfuseMac(); // Get the chip ID as a uint64_t
-  
-  chip_id_high = uint64_t(chip_id >> 32); // Split the chip ID into two uint32_t values
-  chip_id_low  = chip_id;
-  
+  for (int i = 0; i < 17; i += 8) {
+    chip_id |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+  }
+
   char hex_string[9]; // ... Create a char array to store the hex string
   bytes_32 b; // ........... Create a bytes_32 struct to hold the bytes of chip_id_high
-  
-  b.long_val = chip_id_high; // .................. Assign chip_id_high to the long_val member of the struct
-  bytes_to_hex_string(b.bytes, hex_string); // ... Convert the bytes of chip_id_high to a zero-padded hex string
-  USBSerial.print(hex_string); // ................... Print the hex string to the serial port
-  
-  USBSerial.print('_'); //  Print an underscore separator
-  
-  b.long_val = chip_id_low; // ................... Assign chip_id_low to the long_val member of the struct
+
+  b.long_val = chip_id; // ....................... Assign chip_id_low to the long_val member of the struct
   bytes_to_hex_string(b.bytes, hex_string); // ... Convert the bytes of chip_id_low to a zero-padded hex string
-  USBSerial.print(hex_string); // ................... Print the hex string to the serial port
-  
+  USBSerial.print(hex_string); // ................ Print the hex string to the serial port
+
   USBSerial.println(); // Print a newline character
 }

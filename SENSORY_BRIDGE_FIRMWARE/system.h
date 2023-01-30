@@ -3,13 +3,14 @@ extern void run_sweet_spot();
 extern void show_leds();
 
 void reboot() {
+  led_thread_halt = true;
   USBSerial.println("--- ! REBOOTING to apply changes (You may need to restart the Serial Monitor)");
   USBSerial.flush();
   for(float i = 1.0; i >= 0.0; i-=0.05){
     MASTER_BRIGHTNESS = i;
     run_sweet_spot();
     show_leds();
-    delay(12); // Takes ~250ms total
+    FastLED.delay(12); // Takes ~250ms total
   }
   FastLED.setBrightness(0);
   FastLED.show();
@@ -195,12 +196,12 @@ void generate_a_weights() {
 
 void generate_window_lookup() {
   start_timing("GENERATING HANN WINDOW LOOKUP TABLE");
-  for (uint16_t i = 0; i < 1024; i++) {
-    float ratio = i / 2047.0;
+  for (uint16_t i = 0; i < 2048; i++) {
+    float ratio = i / 4095.0;
     float weighing_factor = 0.54 * (1.0 - cos(TWOPI * ratio));
 
     window_lookup[i]        = 32767 * weighing_factor;
-    window_lookup[2047 - i] = 32767 * weighing_factor;
+    window_lookup[4095 - i] = 32767 * weighing_factor;
   }
   end_timing();
 }
@@ -218,7 +219,7 @@ void generate_frequency_data() {
     }
 
     frequencies[i].target_freq = notes[note_index];
-    frequencies[i].block_size  = (CONFIG.MAX_BLOCK_SIZE) - ((CONFIG.MAX_BLOCK_SIZE * 0.95) * sqrt(sqrt(prog)));
+    frequencies[i].block_size  = (CONFIG.MAX_BLOCK_SIZE) - ((CONFIG.MAX_BLOCK_SIZE * 0.95) * sqrt(sqrt(sqrt(prog))));
     frequencies[i].block_size_recip = 1.0 / float(frequencies[i].block_size);
 
     frequencies[i].zone = (i / float(NUM_FREQS)) * NUM_ZONES;
@@ -227,7 +228,7 @@ void generate_frequency_data() {
     float coeff = 2.0 * cos(w);
     frequencies[i].coeff_q14 = (1 << 14) * coeff;
 
-    frequencies[i].window_mult = 2048.0 / frequencies[i].block_size;
+    frequencies[i].window_mult = 4096.0 / frequencies[i].block_size;
   }
   end_timing();
 }
@@ -322,11 +323,11 @@ void log_fps(uint32_t t_now_us) {
     fps_sum += fps_history[i];
   }
 
-  FPS = fps_sum / 10.0;
+  SYSTEM_FPS = fps_sum / 10.0;
 
   if (stream_fps == true) {
     USBSerial.print("sbs((fps=");
-    USBSerial.print(FPS);
+    USBSerial.print(SYSTEM_FPS);
     USBSerial.println("))");
   }
 

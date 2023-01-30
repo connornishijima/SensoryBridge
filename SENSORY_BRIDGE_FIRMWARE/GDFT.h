@@ -57,6 +57,9 @@
 
 // Obscure audio magic happens here
 void IRAM_ATTR process_GDFT() {
+  static bool interlace_flip = false;
+  interlace_flip = !interlace_flip; // Switch field every frame on lower notes to save execution time
+  
   // Reset magnitude caps every frame
   for (uint8_t i = 0; i < NUM_ZONES; i++) {
     max_mags[i] = CONFIG.MAGNITUDE_FLOOR;  // Higher than the average noise floor
@@ -71,26 +74,45 @@ void IRAM_ATTR process_GDFT() {
   // Run GDFT (Goertzel-based Discrete Fourier Transform) with 64 frequencies
   // Fixed-point code adapted from example here: https://sourceforge.net/p/freetel/code/HEAD/tree/misc/goertzal/goertzal.c
   for (uint16_t i = 0; i < NUM_FREQS; i++) { // Run 64 times
-    int32_t q0, q1, q2;
-    int64_t mult;
-    
-    q1 = 0;
-    q2 = 0;
+    bool field = bitRead(i, 0); // odd or even
 
-    for (uint16_t n = 0; n < frequencies[i].block_size; n++) { // Run Goertzel for "block_size" iterations
+    // If note is part of field being rendered, is >= index 16, or is the first note 
+    if (field == interlace_flip || i >= 16) {
+      int32_t q0, q1, q2;
+      int64_t mult;
+
+      q1 = 0;
+      q2 = 0;
+
+      float window_pos = 0.0;
+      for (uint16_t n = 0; n < frequencies[i].block_size; n++) { // Run Goertzel for "block_size" iterations
+        int32_t sample = 0;
+        sample = ((int32_t)sample_window[SAMPLE_HISTORY_LENGTH - 1 - n] * (int32_t)window_lookup[uint16_t(window_pos)]) >> 16;
+        mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
+        q0 = (sample >> 6) + (mult >> 14) - q2;
+        q2 = q1;
+        q1 = q0;
+
+        window_pos += frequencies[i].window_mult;
+      }
+
       mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
-      q0 = (sample_window[SAMPLE_HISTORY_LENGTH - 1 - n] >> 6) + (mult >> 14) - q2;
-      q2 = q1;
-      q1 = q0;
-    }
+      magnitudes[i] = q2 * q2 + q1 * q1 - ((int32_t)(mult >> 14)) * q2; // Calculate raw magnitudes
 
-    mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
-    magnitudes[i] = q2 * q2 + q1 * q1 - ((int32_t)(mult >> 14)) * q2; // Calculate raw magnitudes
+      // Normalize output
+      magnitudes[i] *= float(frequencies[i].block_size_recip);
 
-    magnitudes[i] *= float(frequencies[i].block_size_recip); // Normalize output
+      // Scale magnitudes this way to help even out the response curve further
+      float prog = i / float(NUM_FREQS);
+      prog *= prog;
+      if (prog < 0.1) {
+        prog = 0.1;
+      }
+      magnitudes[i] *= prog;
 
-    if (magnitudes[i] < 0.0) { // Prevent negative values
-      magnitudes[i] = 0.0;
+      if (magnitudes[i] < 0.0) { // Prevent negative values
+        magnitudes[i] = 0.0;
+      }
     }
   }
 
@@ -112,7 +134,7 @@ void IRAM_ATTR process_GDFT() {
   // Gather noise data if noise_complete == false
   if (noise_complete == false) {
     for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-      if (magnitudes[i] > noise_samples[i]) { 
+      if (magnitudes[i] > noise_samples[i]) {
         noise_samples[i] = magnitudes[i];
       }
     }
@@ -129,7 +151,7 @@ void IRAM_ATTR process_GDFT() {
   // Apply noise reduction data, estimate max values
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
     if (noise_complete == true) {
-      magnitudes[i] -= noise_samples[i] * 1.5; // Treat noise 1.5x louder than calibration
+      magnitudes[i] -= noise_samples[i] * 1.2; // Treat noise 1.2x louder than calibration
       if (magnitudes[i] < 0.0) {
         magnitudes[i] = 0.0;
       }
@@ -214,12 +236,12 @@ void IRAM_ATTR process_GDFT() {
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
     if (mag_targets[i] > mag_followers[i]) {
       float delta = mag_targets[i] - mag_followers[i];
-      mag_followers[i] += delta * (smoothing_follower * 0.5);
+      mag_followers[i] += delta * (smoothing_follower * 0.45);
     }
 
     else if (mag_targets[i] < mag_followers[i]) {
       float delta = mag_followers[i] - mag_targets[i];
-      mag_followers[i] -= delta * (smoothing_follower * 0.375);
+      mag_followers[i] -= delta * (smoothing_follower * 0.55);
     }
   }
 
@@ -228,11 +250,11 @@ void IRAM_ATTR process_GDFT() {
   for (uint8_t i = 0; i < NUM_ZONES; i++) {
     if (max_mags[i] > max_mags_followers[i]) {
       float delta = max_mags[i] - max_mags_followers[i];
-      max_mags_followers[i] += delta * 0.075;
+      max_mags_followers[i] += delta * 0.05;
     }
     if (max_mags[i] < max_mags_followers[i]) {
       float delta = max_mags_followers[i] - max_mags[i];
-      max_mags_followers[i] -= delta * 0.075;
+      max_mags_followers[i] -= delta * 0.05;
     }
   }
 
@@ -264,8 +286,8 @@ void IRAM_ATTR process_GDFT() {
     mag_float = mag_float * (1.0 - smoothing_exp_average) + mag_float_last[i] * smoothing_exp_average;
     mag_float_last[i] = mag_float;
 
-    mag_float *= CONFIG.GAIN;
-    if(mag_float > 1.0){
+    mag_float *= (CONFIG.GAIN);
+    if (mag_float > 1.0) {
       mag_float = 1.0;
     }
 

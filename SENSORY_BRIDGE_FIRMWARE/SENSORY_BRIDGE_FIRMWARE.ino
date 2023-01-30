@@ -50,7 +50,7 @@
 
   ---------------------------------------------------------------------*/
 
-#define FIRMWARE_VERSION 30001  // Try "V" on the Serial port for this!
+#define FIRMWARE_VERSION 30100  // Try "V" on the Serial port for this!
 //                       Mm P     M = Major version, m = Minor version, P = Patch version
 //                                (i.e 3.5.4 would be 30504)
 
@@ -98,6 +98,9 @@ enum lightshow_modes {
 // Setup, runs only one time ---------------------------------------------------------
 void setup() {
   init_system(); // (system.h) Initialize all hardware and arrays
+
+  // Create thread specifically for LED updates
+  xTaskCreatePinnedToCore(led_thread, "led_task", 4096, NULL, tskIDLE_PRIORITY + 1, &led_task, 1);
 }
 
 // Loop, runs forever after setup() --------------------------------------------------
@@ -142,13 +145,9 @@ void loop() {
   lookahead_smoothing(); // (GDFT.h)
   // Peek at upcoming frames to study/prevent flickering
 
-  function_id = 9;
-  render_leds(t_now_us); // (BELOW in this file)
-  // Convert the data we found into a beautiful show
-
-  function_id = 10;
+  function_id = 8;
   log_fps(t_now_us); // (system.h)
-  // Log the current FPS
+  // Log the audio system FPS
 
   if (debug_mode == true) {
     function_id = 31;
@@ -158,46 +157,58 @@ void loop() {
   yield();  // Otherwise the ESP32 will collapse into a black hole or something
 }
 
-// Run the lights! -------------------------------------------------------------------
-void render_leds(uint32_t t_now_us) {
-  if (noise_complete == true) {  // If we're not gathering ambient noise data
-    if (mode_transition_queued == true || noise_transition_queued == true) { // If transition queued
-      run_transition_fade(); // (led_utilities.h) Fade to black between modes
-    }
+// Run the lights in their own thread! -------------------------------------------------------------
+void led_thread(void* arg) {
+  while (true) {
+    if (led_thread_halt == false) {
+      if (noise_complete == true) {  // If we're not gathering ambient noise data
+        if (mode_transition_queued == true || noise_transition_queued == true) { // If transition queued
+          run_transition_fade(); // (led_utilities.h) Fade to black between modes
+        }
 
-    // Based on the value of CONFIG.LIGHTSHOW_MODE, we call a
-    // different rendering function from lightshow_modes.h:
-    
-    if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT) {
-      light_mode_gdft();  // (lightshow_modes.h) GDFT spectrogram display
-    }
-    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {
-      light_mode_gdft_chromagram();  // (lightshow_modes.h) GDFT chromagram display
-    }
-    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
-      light_mode_bloom(false);  // (lightshow_modes.h) Bloom Mode display
-    }
-    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
-      light_mode_bloom(true);  // (lightshow_modes.h) Bloom Mode display (faster)
-    }
-    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
-      light_mode_vu();  // (lightshow_modes.h) VU Mode display
-    }
-    else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
-      light_mode_vu_dot();  // (lightshow_modes.h) VU Mode display (dot version)
-    }
+        // Based on the value of CONFIG.LIGHTSHOW_MODE, we call a
+        // different rendering function from lightshow_modes.h:
 
-    if (CONFIG.MIRROR_ENABLED) {  // Mirroring logic
-      // Don't scale Bloom Mode before mirroring
-      if (CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM && CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM_FAST) {
-        scale_image_to_half();  // (led_utilities.h) Image is now 50% height
+        if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT) {
+          light_mode_gdft();  // (lightshow_modes.h) GDFT spectrogram display
+        }
+        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {
+          light_mode_gdft_chromagram();  // (lightshow_modes.h) GDFT chromagram display
+        }
+        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
+          light_mode_bloom(false);  // (lightshow_modes.h) Bloom Mode display
+        }
+        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
+          light_mode_bloom(true);  // (lightshow_modes.h) Bloom Mode display (faster)
+        }
+        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
+          light_mode_vu();  // (lightshow_modes.h) VU Mode display
+        }
+        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
+          light_mode_vu_dot();  // (lightshow_modes.h) VU Mode display (dot version)
+        }
+
+        if (CONFIG.MIRROR_ENABLED) {  // Mirroring logic
+          // Don't scale Bloom Mode before mirroring
+          if (CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM && CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM_FAST) {
+            scale_image_to_half();  // (led_utilities.h) Image is now 50% height
+          }
+          shift_leds_up(64);         // (led_utilities.h) Move image up one half
+          mirror_image_downwards();  // (led_utilities.h) Mirror downwards
+        }
+      } else {
+        noise_cal_led_readout();  // (noise_cal.h) Show the noise profile and progress during calibration
       }
-      shift_leds_up(64);         // (led_utilities.h) Move image up one half
-      mirror_image_downwards();  // (led_utilities.h) Mirror downwards
-    }
-  } else {
-    noise_cal_led_readout();  // (noise_cal.h) Show the noise profile and progress during calibration
-  }
 
-  show_leds();  // This sends final RGB data to the LEDS (led_utilities.h)
+      show_leds();  // This sends final RGB data to the LEDS (led_utilities.h)
+      LED_FPS = FastLED.getFPS();
+    }
+
+    if (CONFIG.LED_TYPE == LED_NEOPIXEL) {
+      vTaskDelay(1); // delay for 1ms to avoid hogging the CPU
+    }
+    else if (CONFIG.LED_TYPE == LED_DOTSTAR) { // More delay to compensate for faster LEDs
+      vTaskDelay(3); // delay for 3ms to avoid hogging the CPU
+    }
+  }
 }
