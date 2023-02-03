@@ -1,0 +1,84 @@
+<html>
+  <head>
+    <title>Audio Transfer Testing</title>
+    
+      <script>
+let bit_list = [0,1,1,1,1,0,1,1,0,0,1,0,0,0,1,0,0,1,0,1,0,0,1,1,0,1,0,1,0,0,1,1,0,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1,1,1,0,1,0,0,0,1,0,0,0,1,0,0,1,0,1,0,1,0,0,0,1,1,0,0,1,0,1,0,1,1,0,1,1,0,0,0,1,1,0,1,1,0,0,0,1,0,0,1,1,0,1,0,1,1,1,1,0,0,1,0,1,0,1,0,1,1,1,0,1,1,0,1,0,0,1,0,1,0,0,0,1,1,0,0,1,1,0,1,0,0,1,0,1,0,0,1,1,0,0,0,1,1,0,1,1,1,1,0,1,1,1,0,1,1,0,0,1,1,0,0,1,0,1,0,1,0,0,1,0,0,0,0,1,1,0,0,1,0,1,0,1,1,1,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,0,1,1,0,1,0,1,0,0,1,1,0,0,1,0,0,0,1,0,0,0,1,1,1,0,1,0,0,0,1,0,0,0,1,0,0,1,1,1,0,1,0,0,0,1,1,0,1,0,0,0,0,1,1,0,1,0,0,1,0,1,1,1,0,0,1,1,0,1,1,0,1,0,0,1,0,1,1,1,0,0,1,1,0,1,1,1,0,1,0,0,0,1,1,0,1,0,0,0,0,1,1,0,0,1,0,1,0,1,1,1,0,0,0,0,0,1,1,0,0,0,0,1,0,1,1,1,0,0,1,1,0,1,1,1,0,0,1,1,0,1,1,1,0,1,1,1,0,1,1,0,1,1,1,1,0,1,1,1,0,0,1,0,0,1,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,1,1,1,1,1,0,1];
+      
+      let bit_interval_ms = 50;
+    let mult = 2.0;
+  
+function generate_sound(bit) {    
+  let context = new (window.AudioContext || window.webkitAudioContext)();
+  let sample_rate = context.sampleRate;
+  let frequency_1 = 440*mult;
+  let frequency_2 = bit === 0 ? 554.3653*mult : 659.2551*mult;
+  let amplitude = 0.5;
+
+  let oscillator_1 = context.createOscillator();
+  oscillator_1.frequency.value = frequency_1;
+  oscillator_1.type = "sine";
+
+  let oscillator_2 = context.createOscillator();
+  oscillator_2.frequency.value = frequency_2;
+  oscillator_2.type = "sine";
+
+  let gain_node_1 = context.createGain();
+  gain_node_1.gain.value = 0;
+
+  let gain_node_2 = context.createGain();
+  gain_node_2.gain.value = 0;
+
+  oscillator_1.connect(gain_node_1);
+  oscillator_2.connect(gain_node_2);
+
+  gain_node_1.connect(context.destination);
+  gain_node_2.connect(context.destination);
+
+  let start_time = context.currentTime;
+  let half_bit_interval_time = start_time + (bit_interval_ms / 2000);
+  let stop_time = start_time + (bit_interval_ms / 1000);
+
+  oscillator_1.start(half_bit_interval_time);
+  oscillator_2.start(start_time);
+
+  gain_node_1.gain.setTargetAtTime(amplitude, half_bit_interval_time, 0.002);
+  gain_node_2.gain.setTargetAtTime(amplitude, start_time, 0.002);
+
+  gain_node_1.gain.setTargetAtTime(0, stop_time - 0.002, 0.002);
+  gain_node_2.gain.setTargetAtTime(0, stop_time - 0.002, 0.002);
+
+  oscillator_1.stop(stop_time);
+  oscillator_2.stop(stop_time);
+}
+
+function play_bits(bits) {
+  let i = 0;
+
+  function play_next_bit() {
+    if (i >= bits.length) {
+      return;
+    }
+
+    generate_sound(bits[i]);
+
+    setTimeout(() => {
+      i++;
+      play_next_bit();
+    }, bit_interval_ms);
+  }
+
+  play_next_bit();
+}
+
+      function play(){
+          console.log("HERE");
+play_bits(bit_list);
+      }
+      
+    </script> 
+  </head>
+  <body>
+    <button onclick="setTimeout(play,500);">PLAY</button>
+  </body>
+</html>
