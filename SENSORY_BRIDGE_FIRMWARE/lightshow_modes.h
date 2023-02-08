@@ -31,12 +31,12 @@ void light_mode_gdft() {
 
     CRGB col1 = CRGB(0, 0, 0);
     hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
-      CHSV(led_hue_a, 255, brightness_levels[i]),
+      CHSV(led_hue_a, CONFIG.HUE_SATURATION, brightness_levels[i]),
       col1);
 
     CRGB col2 = CRGB(0, 0, 0);
     hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
-      CHSV(led_hue_b, 255, brightness_levels[i]),
+      CHSV(led_hue_b, CONFIG.HUE_SATURATION, brightness_levels[i]),
       col2);
 
     leds[i * 2 + 0] = col1;  // Two LEDs at a time so that mirror mode works gracefully
@@ -73,7 +73,7 @@ void light_mode_gdft_chromagram() {
     }
 
     hsv2rgb_spectrum(  // Spectrum has better low-light color resolution than default "rainbow" HSV behavior
-      CHSV(led_hue, 255, led_brightness),
+      CHSV(led_hue, CONFIG.HUE_SATURATION, led_brightness),
       leds[i]
     );
   }
@@ -107,7 +107,7 @@ void light_mode_bloom(bool fast_scroll) {
       CRGB out_col;
       if (chromatic_mode == true) {
         hsv2rgb_spectrum(
-          CHSV(255 * prog, 255, bright),
+          CHSV(255 * prog, CONFIG.HUE_SATURATION, bright),
           out_col);
       }
       else {
@@ -119,7 +119,7 @@ void light_mode_bloom(bool fast_scroll) {
 
     if (chromatic_mode == false) {
       hsv2rgb_spectrum(
-        CHSV(255 * chroma_val, 255, brightness_sum),
+        CHSV(255 * chroma_val, CONFIG.HUE_SATURATION, brightness_sum),
         sum_color);
     }
 
@@ -185,7 +185,7 @@ void light_mode_waveform() {
     if (chromatic_mode == true) {
       CRGB out_col;
       hsv2rgb_spectrum(
-        CHSV(255 * prog, 255, bright),
+        CHSV(255 * prog, CONFIG.HUE_SATURATION, bright),
         out_col);
 
       sum_color += out_col;
@@ -197,7 +197,7 @@ void light_mode_waveform() {
 
   if (chromatic_mode == false) {
     hsv2rgb_spectrum(
-      CHSV(255 * chroma_val, 255, brightness_sum),
+      CHSV(255 * chroma_val, CONFIG.HUE_SATURATION, brightness_sum),
       sum_color);
   }
 
@@ -287,14 +287,14 @@ void light_mode_vu() {
 
       CRGB out_col;
       hsv2rgb_spectrum(
-        CHSV(255 * prog, 255, led_share * bin),
+        CHSV(255 * prog, CONFIG.HUE_SATURATION, led_share * bin),
         out_col);
 
       sum_color += out_col;
     }
   }
   else {
-    sum_color = CHSV(255 * chroma_val, 255, 255); // User color selection
+    sum_color = CHSV(255 * chroma_val, CONFIG.HUE_SATURATION, 255); // User color selection
   }
 
   CHSV hsv = rgb2hsv_approximate(sum_color);
@@ -357,7 +357,7 @@ void light_mode_vu_dot() {
 
       CRGB out_col;
       hsv2rgb_spectrum(
-        CHSV(255 * prog, 255, led_share * bin),
+        CHSV(255 * prog, CONFIG.HUE_SATURATION, led_share * bin),
         out_col);
 
       sum_color += out_col;

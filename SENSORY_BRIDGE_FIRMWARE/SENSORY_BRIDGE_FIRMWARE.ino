@@ -88,6 +88,7 @@ enum lightshow_modes {
 #include "noise_cal.h" // --------- Background noise removal
 #include "p2p.h" // --------------- Sensory Sync handling
 #include "utilities.h" // --------- Misc. math and other functions
+#include "audio_transfer.h" // ---- Used to recieve binary information in style via microphone
 #include "buttons.h" // ----------- Watch the status of buttons
 #include "knobs.h" // ------------- Watch the status of knobs...
 #include "serial_menu.h" // ------- Watch the Serial port... *sigh*

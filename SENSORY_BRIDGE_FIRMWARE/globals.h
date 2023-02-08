@@ -31,6 +31,7 @@ struct conf {
   bool     IS_MAIN_UNIT;
   uint32_t MAX_CURRENT_MA;
   bool     TEMPORAL_DITHERING;
+  uint8_t  HUE_SATURATION;
 };
 
 // ------------------------------------------------------------
@@ -66,6 +67,7 @@ conf CONFIG = {
   false,               // IS_MAIN_UNIT
   1500,                // MAX_CURRENT_MA
   true,                // TEMPORAL_DITHERING
+  255,                 // HUE_SATURATION;
 };
 
 conf CONFIG_DEFAULTS; // Used for resetting to default values at runtime

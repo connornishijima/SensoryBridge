@@ -311,6 +311,7 @@ void parse_command(char* command_buf) {
     USBSerial.println("                      bass_mode=[true/false] | Toggle bass-mode, which alters note_offset and chromagram_range for bass-y tunes");
     USBSerial.println("           max_current_ma=[int or 'default'] | Sets the maximum current FastLED will attempt to limit the LED consumption to");
     USBSerial.println("     temporal_dithering=[true/false/default] | Toggle per-LED temporal dithering that simulates higher bit-depths");
+    USBSerial.println("         hue_saturation=[0-255 or 'default'] | Set the global saturation used in CHSV functions");
     tx_end();
   }
 
@@ -1085,6 +1086,22 @@ void parse_command(char* command_buf) {
       tx_begin();
       USBSerial.print("CONFIG.MAX_CURRENT_MA: ");
       USBSerial.println(CONFIG.MAX_CURRENT_MA);
+      tx_end();
+    }
+
+    // Set CHSV Saturation ----------------------------
+    else if (strcmp(command_type, "hue_saturation") == 0) {
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.HUE_SATURATION = CONFIG_DEFAULTS.HUE_SATURATION;
+      }
+      else {
+        CONFIG.HUE_SATURATION = constrain(atof(command_data), 0, 255);
+      }
+      
+      save_config_delayed();
+      tx_begin();
+      USBSerial.print("CONFIG.HUE_SATURATION: ");
+      USBSerial.println(CONFIG.HUE_SATURATION);
       tx_end();
     }
 

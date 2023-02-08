@@ -290,6 +290,11 @@ void init_system() {
     enable_usb_update_mode();
   }
 
+  // NOISE held down on boot
+  if (digitalRead(noise_button.pin) == LOW) {
+    enable_audio_transfer_mode();
+  }
+
   init_i2s();
   init_p2p();
   generate_a_weights();
