@@ -218,8 +218,10 @@ void generate_frequency_data() {
       note_index = max_index - 1;
     }
 
+    float block_size_mix = 1.0-sqrt(sqrt(prog));
+
     frequencies[i].target_freq = notes[note_index];
-    frequencies[i].block_size  = (CONFIG.MAX_BLOCK_SIZE) - ((CONFIG.MAX_BLOCK_SIZE * 0.95) * sqrt(sqrt(sqrt(prog))));
+    frequencies[i].block_size  = CONFIG.MAX_BLOCK_SIZE * block_size_mix + CONFIG.MIN_BLOCK_SIZE * (1.0-block_size_mix);
     frequencies[i].block_size_recip = 1.0 / float(frequencies[i].block_size);
 
     frequencies[i].zone = (i / float(NUM_FREQS)) * NUM_ZONES;
@@ -288,11 +290,6 @@ void init_system() {
   // MODE held down on boot
   if (digitalRead(mode_button.pin) == LOW) {
     enable_usb_update_mode();
-  }
-
-  // NOISE held down on boot
-  if (digitalRead(noise_button.pin) == LOW) {
-    enable_audio_transfer_mode();
   }
 
   init_i2s();

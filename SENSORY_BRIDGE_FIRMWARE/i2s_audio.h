@@ -4,32 +4,47 @@
 
 #include <driver/i2s.h>
 
+#if defined(CONFIG_IDF_TARGET_ESP32S2)
+const i2s_config_t i2s_config = { // Many of these settings are defined in (constants.h)
+  .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
+  .sample_rate = CONFIG.SAMPLE_RATE,
+  .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
+  .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
+  .communication_format = (i2s_comm_format_t) (I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
+  .dma_buf_count = 1024 / (CONFIG.SAMPLES_PER_CHUNK * 2),
+  .dma_buf_len = CONFIG.SAMPLES_PER_CHUNK * 2
+};
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+const i2s_config_t i2s_config = { // Many of these settings are defined in (constants.h)
+  .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
+  .sample_rate = CONFIG.SAMPLE_RATE,
+  .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
+  .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+  .communication_format = (i2s_comm_format_t) (I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
+  .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+  .dma_buf_count = 1024 / CONFIG.SAMPLES_PER_CHUNK,
+  .dma_buf_len = CONFIG.SAMPLES_PER_CHUNK
+};
+#endif
+
+const i2s_pin_config_t pin_config = { // These too
+  .bck_io_num   = I2S_BCLK_PIN,
+  .ws_io_num    = I2S_LRCLK_PIN,
+  .data_out_num = -1,  // not used (only for outputs)
+  .data_in_num  = I2S_DIN_PIN
+};
+
 void init_i2s() {
-  const i2s_config_t i2s_config = { // Many of these settings are defined in (constants.h)
-    .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
-    .sample_rate = CONFIG.SAMPLE_RATE,
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
-    .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
-    .communication_format = (i2s_comm_format_t) (I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
-    .dma_buf_count = 1024 / (CONFIG.SAMPLES_PER_CHUNK * 2),
-    .dma_buf_len = CONFIG.SAMPLES_PER_CHUNK * 2
-  };
-
-  const i2s_pin_config_t pin_config = { // These too
-    .bck_io_num   = I2S_BCLK_PIN,
-    .ws_io_num    = I2S_LRCLK_PIN,
-    .data_out_num = -1,  // not used (only for outputs)
-    .data_in_num  = I2S_DIN_PIN
-  };
-
   // Init I2S Driver
   esp_err_t result = i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
   USBSerial.print("INIT I2S: ");
   USBSerial.println(result == ESP_OK ? PASS : FAIL);
 
   // ESP32-S2 changes to help SPH0645 mic
+#if defined(CONFIG_IDF_TARGET_ESP32S2)
   REG_SET_BIT(I2S_TIMING_REG(I2S_PORT), BIT(9));
   REG_SET_BIT(I2S_CONF_REG(I2S_PORT), I2S_RX_MSB_SHIFT);
+#endif
 
   // Set I2S pins
   result = i2s_set_pin(I2S_PORT, &pin_config);
@@ -59,6 +74,8 @@ void acquire_sample_chunk(uint32_t t_now) {
 
     sample = sample >> 2; // Helps prevent overflow in fixed-point math coming up
 
+    sample *= CONFIG.SENSITIVITY; // Set sensitivity gain
+
     if (sample > 32767) { // clipping
       sample = 32767;
     } else if (sample < -32767) {
@@ -68,7 +85,7 @@ void acquire_sample_chunk(uint32_t t_now) {
     waveform[i] = sample - CONFIG.DC_OFFSET;
     waveform_history[waveform_history_index][i] = waveform[i];
 
-    uint32_t sample_abs = abs(sample) * CONFIG.GAIN;
+    uint32_t sample_abs = abs(sample);
     if (sample_abs > max_waveform_val_raw) {
       max_waveform_val_raw = sample_abs;
     }
@@ -91,14 +108,14 @@ void acquire_sample_chunk(uint32_t t_now) {
     silent_scale = 1.0; // Force LEDs on during calibration
 
     if (noise_iterations >= 64 && noise_iterations <= 192) { // sample in the middle of noise cal
-      if (max_waveform_val_raw * 1.10 > CONFIG.SWEET_SPOT_MIN_LEVEL) { // Sweet Spot Min threshold should be the silence level + 15%
-        CONFIG.SWEET_SPOT_MIN_LEVEL = max_waveform_val_raw * 1.10;
+      if (max_waveform_val_raw*1.10 > CONFIG.SWEET_SPOT_MIN_LEVEL) { // Sweet Spot Min threshold should be the silence level + 15%
+        CONFIG.SWEET_SPOT_MIN_LEVEL = max_waveform_val_raw*1.10;
       }
     }
   }
   else {
     max_waveform_val = (max_waveform_val_raw - (CONFIG.SWEET_SPOT_MIN_LEVEL));
-
+    
     if (max_waveform_val > max_waveform_val_follower) {
       float delta = max_waveform_val - max_waveform_val_follower;
       max_waveform_val_follower += delta * 0.25;

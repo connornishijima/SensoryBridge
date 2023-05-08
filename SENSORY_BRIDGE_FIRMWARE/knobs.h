@@ -2,6 +2,19 @@
   Sensory Bridge KNOB FUNCTIONS
 ----------------------------------------*/
 
+uint16_t avg_read(uint8_t pin){
+  uint32_t sum = 0;
+  sum += analogRead(pin);
+  sum += analogRead(pin);
+  sum += analogRead(pin);
+  sum += analogRead(pin);
+  sum += analogRead(pin);
+  sum += analogRead(pin);
+  sum += analogRead(pin);
+  sum += analogRead(pin);
+  return sum >> 3;
+}
+
 void check_knobs(uint32_t t_now) {
   // On every 10th frame, the knobs are read. The resulting
   // values are put through the same "follower" smoothing
@@ -28,9 +41,9 @@ void check_knobs(uint32_t t_now) {
   iter++;
 
   if (iter % 10 == 0) { // If frame count is multiple of 10
-    PHOTONS_TARGET = (1.0 - (analogRead(PHOTONS_PIN) / 8192.0));
-    CHROMA_TARGET  = (1.0 - (analogRead(CHROMA_PIN)  / 8192.0));
-    MOOD_TARGET    = (1.0 - (analogRead(MOOD_PIN)    / 8192.0));
+    PHOTONS_TARGET = (1.0 - (avg_read(PHOTONS_PIN) / 8192.0));
+    CHROMA_TARGET  = (1.0 - (avg_read(CHROMA_PIN)  / 8192.0));
+    MOOD_TARGET    = (1.0 - (avg_read(MOOD_PIN)    / 8192.0));
   }
 
   // Happens every frame:
@@ -114,6 +127,6 @@ void check_knobs(uint32_t t_now) {
   // Making 0.1 the bottom value prevents the LEDs from experiencing 0% change per frame! ;)
 
   // These are the final values we'll feed into the two smoothing algorithms soon
-  smoothing_follower    = 0.225 + (smoothing_top_half * 0.275); // 0.0-1.0 input range becomes 0.225-0.500
+  smoothing_follower    = 0.100 + (smoothing_top_half * 0.300); // 0.0-1.0 input range becomes 0.1 - 0.400
   smoothing_exp_average = 1.0 - smoothing_bottom_half; // invert input
 }

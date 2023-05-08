@@ -33,3 +33,18 @@ void print_chip_id() {
 
   USBSerial.println(); // Print a newline character
 }
+
+void blur_array(float* input, int length, int kernel_size) {
+    int padding = kernel_size / 2;
+    for (int i = 0; i < length; i++) {
+        float sum = 0.0f;
+        for (int j = -padding; j <= padding; j++) {
+            int k = i + j;
+            if (k < 0) k = 0;
+            if (k >= length) k = length - 1;
+            sum += input[k];
+        }
+        input[i] = sum / (float)kernel_size;
+    }
+}
+

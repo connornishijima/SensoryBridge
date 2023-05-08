@@ -1,13 +1,13 @@
 // AUDIO #######################################################
 
 #define SERIAL_BAUD 230400
-#define DEFAULT_SAMPLE_RATE 12200
+#define DEFAULT_SAMPLE_RATE 24400
 #define SAMPLE_HISTORY_LENGTH 4096
 
 // Don't change this unless you're willing to do a lot of other work on the code :/
 #define NATIVE_RESOLUTION 128
 #define NUM_FREQS 64
-#define NUM_ZONES 4
+#define NUM_ZONES 2
 
 #define I2S_PORT I2S_NUM_0
 
@@ -69,3 +69,5 @@ enum led_types {
   LED_NEOPIXEL,
   LED_DOTSTAR
 };
+
+CRGB incandescent_lookup = CRGB(255, 114, 40);

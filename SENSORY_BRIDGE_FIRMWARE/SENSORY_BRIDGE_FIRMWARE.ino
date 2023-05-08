@@ -19,7 +19,7 @@
   WARNING:
 
     If the above ASCII art is not showing "SENSORY BRIDGE" correctly,
-    you're probably on Arduino 2.0.x. This means you'll need to make a
+    you're probably on < Arduino 2.1.0. This means you'll need to make a
     few changes for this firmware to work.
 
   ####################################################################
@@ -50,55 +50,56 @@
 
   ---------------------------------------------------------------------*/
 
-#define FIRMWARE_VERSION 30100  // Try "V" on the Serial port for this!
-//                       Mm P     M = Major version, m = Minor version, P = Patch version
-//                                (i.e 3.5.4 would be 30504)
+#define FIRMWARE_VERSION 30200  // Try "V" on the Serial port for this!
+//                       MmmPP     M = Major version, m = Minor version, P = Patch version
+//                                 (i.e 3.5.4 would be 30504)
 
 // Lightshow modes by name -----------------------------------------------------------
 enum lightshow_modes {
-  LIGHT_MODE_GDFT, // ------------- GDFT - Goertzel-based Discrete Fourier Transform
-  //                                (I made this name up. Saved you a search.)
-  LIGHT_MODE_GDFT_CHROMAGRAM, // -- Chromagram of GDFT
-  LIGHT_MODE_BLOOM, // ------------ Slow Bloom Mode
-  LIGHT_MODE_BLOOM_FAST, // ------- Fast Bloom Mode
-  LIGHT_MODE_VU, // --------------- Not a real VU for any measurement sake, just a dance-y LED bar
-  LIGHT_MODE_VU_DOT, // ----------- Alternate VU display mode - dot with motion blur
+  LIGHT_MODE_GDFT,  // ------------- GDFT - Goertzel-based Discrete Fourier Transform
+  //                                 (I made this name up. Saved you a search.)
+  LIGHT_MODE_GDFT_CHROMAGRAM,  // -- Chromagram of GDFT
+  LIGHT_MODE_BLOOM,            // -- Slow Bloom Mode
+  LIGHT_MODE_BLOOM_FAST,       // -- Fast Bloom Mode
+  LIGHT_MODE_VU,               // -- Not a real VU for any measurement sake, just a dance-y LED bar
+  LIGHT_MODE_VU_DOT,           // -- Alternate VU display mode - dot with motion blur
+  LIGHT_MODE_KALEIDOSCOPE,     // -- Three color channels 2D Perlin noise affected by the onsets of low, mid and high pitches
 
   NUM_MODES  // used to know the length of this list if it changes in the future
 };
 
 // External dependencies -------------------------------------------------------------
-#include <WiFi.h> // ---------- Needed for Station Mode
-#include <esp_now.h> // ------- P2P wireless communication library (p2p.h below)
-#include <FastLED.h> // ------- Handles LED color data and display
-#include <FS.h> // ------------ Filesystem functions (bridge_fs.h below)
-#include <LittleFS.h> // ------ LittleFS implementation
-#include <Ticker.h> // -------- Scheduled tasks library
-#include <USB.h> // ----------- USB Connection handling
-#include <FirmwareMSC.h> // --- Allows firmware updates via USB MSC
+#include <WiFi.h>         // Needed for Station Mode
+#include <esp_now.h>      // P2P wireless communication library (p2p.h below)
+#include <FastLED.h>      // Handles LED color data and display
+#include <FS.h>           // Filesystem functions (bridge_fs.h below)
+#include <LittleFS.h>     // LittleFS implementation
+#include <Ticker.h>       // Scheduled tasks library
+#include <USB.h>          // USB Connection handling
+#include <FirmwareMSC.h>  // Allows firmware updates via USB MSC
 
 // Include Sensory Bridge firmware files, sorted high to low, by boringness ;) -------
-#include "strings.h" // ----------- Strings for printing
-#include "user_config.h" // ------- Nothing for now
-#include "constants.h" // --------- Global constants
-#include "globals.h" // ----------- Global variables
-#include "bridge_fs.h" // --------- Filesystem access (save/load configuration)
-#include "i2s_audio.h" // --------- I2S Microphone audio capture
-#include "led_utilities.h" // ----- LED color/transform utility functions
-#include "noise_cal.h" // --------- Background noise removal
-#include "p2p.h" // --------------- Sensory Sync handling
-#include "utilities.h" // --------- Misc. math and other functions
-#include "audio_transfer.h" // ---- Used to recieve binary information in style via microphone
-#include "buttons.h" // ----------- Watch the status of buttons
-#include "knobs.h" // ------------- Watch the status of knobs...
-#include "serial_menu.h" // ------- Watch the Serial port... *sigh*
-#include "system.h" // ------------ Watch how fast I can check if settings were updated... yada yada..
-#include "GDFT.h" // -------------- Conversion to (and post-processing of) frequency data! (hey, something cool!)
-#include "lightshow_modes.h" // --- FINALLY, the FUN STUFF!
+#include "strings.h"          // Strings for printing
+#include "user_config.h"      // Nothing for now
+#include "constants.h"        // Global constants
+#include "globals.h"          // Global variables
+#include "presets.h"          // Configuration presets by name
+#include "bridge_fs.h"        // Filesystem access (save/load configuration)
+#include "i2s_audio.h"        // I2S Microphone audio capture
+#include "led_utilities.h"    // LED color/transform utility functions
+#include "noise_cal.h"        // Background noise removal
+#include "p2p.h"              // Sensory Sync handling
+#include "utilities.h"        // Misc. math and other functions
+#include "buttons.h"          // Watch the status of buttons
+#include "knobs.h"            // Watch the status of knobs...
+#include "serial_menu.h"      // Watch the Serial port... *sigh*
+#include "system.h"           // Watch how fast I can check if settings were updated... yada yada..
+#include "GDFT.h"             // Conversion to (and post-processing of) frequency data! (hey, something cool!)
+#include "lightshow_modes.h"  // --- FINALLY, the FUN STUFF!
 
 // Setup, runs only one time ---------------------------------------------------------
 void setup() {
-  init_system(); // (system.h) Initialize all hardware and arrays
+  init_system();  // (system.h) Initialize all hardware and arrays
 
   // Create thread specifically for LED updates
   xTaskCreatePinnedToCore(led_thread, "led_task", 4096, NULL, tskIDLE_PRIORITY + 1, &led_task, 1);
@@ -114,40 +115,40 @@ void loop() {
   // Check if the knobs have changed
 
   function_id = 1;
-  check_buttons(t_now); // (buttons.h)
+  check_buttons(t_now);  // (buttons.h)
   // Check if the buttons have changed
 
   function_id = 2;
-  check_settings(t_now); // (system.h)
+  check_settings(t_now);  // (system.h)
   // Check if the settings have changed
 
   function_id = 3;
-  check_serial(t_now); // (serial_menu.h)
+  check_serial(t_now);  // (serial_menu.h)
   // Check if UART commands are available
 
   function_id = 4;
-  run_p2p(); // (p2p.h)
+  run_p2p();  // (p2p.h)
   // Process P2P network packets to synchronize units
 
   function_id = 5;
-  acquire_sample_chunk(t_now); // (i2s_audio.h)
+  acquire_sample_chunk(t_now);  // (i2s_audio.h)
   // Capture a frame of I2S audio (holy crap, FINALLY something about sound)
 
   function_id = 6;
-  run_sweet_spot(); // (led_utilities.h)
+  run_sweet_spot();  // (led_utilities.h)
   // Based on the current audio volume, alter the Sweet Spot indicator LEDs
 
   function_id = 7;
-  process_GDFT(); // (GDFT.h)
+  process_GDFT();  // (GDFT.h)
   // Execute GDFT and post-process
   // (If you're wondering about that weird acronym, check out the source file)
 
   function_id = 8;
-  lookahead_smoothing(); // (GDFT.h)
+  lookahead_smoothing();  // (GDFT.h)
   // Peek at upcoming frames to study/prevent flickering
 
   function_id = 8;
-  log_fps(t_now_us); // (system.h)
+  log_fps(t_now_us);  // (system.h)
   // Log the audio system FPS
 
   if (debug_mode == true) {
@@ -162,9 +163,15 @@ void loop() {
 void led_thread(void* arg) {
   while (true) {
     if (led_thread_halt == false) {
-      if (noise_complete == true) {  // If we're not gathering ambient noise data
-        if (mode_transition_queued == true || noise_transition_queued == true) { // If transition queued
-          run_transition_fade(); // (led_utilities.h) Fade to black between modes
+      if (noise_complete == true) {                                               // If we're not gathering ambient noise data
+        if (mode_transition_queued == true || noise_transition_queued == true) {  // If transition queued
+          run_transition_fade();                                                  // (led_utilities.h) Fade to black between modes
+        }
+
+        if (CONFIG.AUTO_COLOR_SHIFT == true) {  // Automatically cycle color based on density of positive spectral changes
+          hue_shift -= current_punch;
+        } else {
+          hue_shift = 0;  // Reset hue shift if non-zero
         }
 
         // Based on the value of CONFIG.LIGHTSHOW_MODE, we call a
@@ -172,31 +179,48 @@ void led_thread(void* arg) {
 
         if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT) {
           light_mode_gdft();  // (lightshow_modes.h) GDFT spectrogram display
-        }
-        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {
+        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {
           light_mode_gdft_chromagram();  // (lightshow_modes.h) GDFT chromagram display
-        }
-        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
+        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
           light_mode_bloom(false);  // (lightshow_modes.h) Bloom Mode display
-        }
-        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
+        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
           light_mode_bloom(true);  // (lightshow_modes.h) Bloom Mode display (faster)
-        }
-        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
+        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
           light_mode_vu();  // (lightshow_modes.h) VU Mode display
-        }
-        else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
+        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
           light_mode_vu_dot();  // (lightshow_modes.h) VU Mode display (dot version)
+        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_KALEIDOSCOPE) {
+          light_mode_kaleidoscope();  // (lightshow_modes.h) Kaleidoscope Mode display
+        }
+
+        if(CONFIG.PRISM_COUNT > 0){
+          apply_prism_effect(CONFIG.PRISM_COUNT, 64);
         }
 
         if (CONFIG.MIRROR_ENABLED) {  // Mirroring logic
           // Don't scale Bloom Mode before mirroring
           if (CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM && CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM_FAST) {
-            scale_image_to_half();  // (led_utilities.h) Image is now 50% height
+            scale_image_to_half(leds);  // (led_utilities.h) Image is now 50% height
           }
-          shift_leds_up(64);         // (led_utilities.h) Move image up one half
-          mirror_image_downwards();  // (led_utilities.h) Mirror downwards
+          shift_leds_up(leds, 64);         // (led_utilities.h) Move image up one half
+          mirror_image_downwards(leds);  // (led_utilities.h) Mirror downwards
         }
+
+        // Render bulb filter
+        if (CONFIG.BULB_OPACITY > 0.00) {
+          render_bulb_cover();
+        }
+
+        // If forcing monochromatic incandescent output
+        if (CONFIG.INCANDESCENT_MODE == true) {
+          force_incandescent_output();
+        }
+
+        // If not forcing incandescent mode, tint the color image with an incandescent LUT to reduce harsh blues
+        else if (CONFIG.INCANDESCENT_FILTER > 0.0) {
+          apply_incandescent_filter();
+        }
+
       } else {
         noise_cal_led_readout();  // (noise_cal.h) Show the noise profile and progress during calibration
       }
@@ -206,10 +230,9 @@ void led_thread(void* arg) {
     }
 
     if (CONFIG.LED_TYPE == LED_NEOPIXEL) {
-      vTaskDelay(1); // delay for 1ms to avoid hogging the CPU
-    }
-    else if (CONFIG.LED_TYPE == LED_DOTSTAR) { // More delay to compensate for faster LEDs
-      vTaskDelay(3); // delay for 3ms to avoid hogging the CPU
+      //vTaskDelay(1); // delay for 1ms to avoid hogging the CPU
+    } else if (CONFIG.LED_TYPE == LED_DOTSTAR) {  // More delay to compensate for faster LEDs
+      vTaskDelay(3);                              // delay for 3ms to avoid hogging the CPU
     }
   }
 }

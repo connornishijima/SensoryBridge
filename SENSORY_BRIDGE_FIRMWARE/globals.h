@@ -20,7 +20,7 @@ struct conf {
   bool     LED_INTERPOLATION;
   uint16_t MAX_BLOCK_SIZE;
   uint16_t SAMPLES_PER_CHUNK;
-  float    GAIN;
+  float    SENSITIVITY;
   bool     BOOT_ANIMATION;
   uint32_t SWEET_SPOT_MIN_LEVEL;
   uint32_t SWEET_SPOT_MAX_LEVEL;
@@ -31,7 +31,14 @@ struct conf {
   bool     IS_MAIN_UNIT;
   uint32_t MAX_CURRENT_MA;
   bool     TEMPORAL_DITHERING;
-  uint8_t  HUE_SATURATION;
+  uint16_t MIN_BLOCK_SIZE;
+  bool     AUTO_COLOR_SHIFT;
+  float    INCANDESCENT_FILTER;
+  bool     INCANDESCENT_MODE;
+  float    BACKDROP_BRIGHTNESS;
+  float    BULB_OPACITY;
+  float    SATURATION;
+  uint8_t  PRISM_COUNT;
 };
 
 // ------------------------------------------------------------
@@ -43,31 +50,38 @@ conf CONFIG = {
   0.00, // CHROMA
   0.05, // MOOD
   LIGHT_MODE_GDFT, // LIGHTSHOW_MODE
-  true,            // MIRROR_ENABLED (>= 3.0.0 defaults yes)
+  false,           // MIRROR_ENABLED (>= 3.2.0 defaults no)
 
   // Private values
   DEFAULT_SAMPLE_RATE, // SAMPLE_RATE
   12,                  // NOTE_OFFSET
   1,                   // SQUARE_ITER
-  20,                  // MAGNITUDE_FLOOR
+  3000,                // MAGNITUDE_FLOOR
   LED_NEOPIXEL,        // LED_TYPE
   128,                 // LED_COUNT
   GRB,                 // LED_COLOR_ORDER
   true,                // LED_INTERPOLATION
-  1500,                // MAX_BLOCK_SIZE
+  3000,                // MAX_BLOCK_SIZE
   128,                 // SAMPLES_PER_CHUNK
-  1.0,                 // GAIN
+  1.0,                 // SENSITIVITY
   true,                // BOOT_ANIMATION
   750,                 // SWEET_SPOT_MIN_LEVEL
   30000,               // SWEET_SPOT_MAX_LEVEL
   0,                   // DC_OFFSET
-  64,                  // CHROMAGRAM_RANGE
-  true,                // STANDBY_DIMMING
+  60,                  // CHROMAGRAM_RANGE
+  false,               // STANDBY_DIMMING
   false,               // REVERSE_ORDER
   false,               // IS_MAIN_UNIT
   1500,                // MAX_CURRENT_MA
   true,                // TEMPORAL_DITHERING
-  255,                 // HUE_SATURATION;
+  5,                   // MIN_BLOCK_SIZE
+  false,               // AUTO_COLOR_SHIFT
+  0.80,                // INCANDESCENT_FILTER
+  false,               // INCANDESCENT_MODE
+  0.00,                // BACKDROP_BRIGHTNESS
+  0.00,                // BULB_OPACITY
+  1.00,                // SATURATION
+  0,                   // PRISM_COUNT
 };
 
 conf CONFIG_DEFAULTS; // Used for resetting to default values at runtime
@@ -119,6 +133,7 @@ float a_weight_table[13][2] = {
 
 float note_spectrogram[NUM_FREQS] = {0};
 float note_spectrogram_smooth[NUM_FREQS] = {0};
+float note_spectrogram_smooth_frame_blending[NUM_FREQS] = {0};
 float note_spectrogram_long_term[NUM_FREQS] = {0};
 float note_chromagram[12]  = {0};
 float chromagram_max_val = 0.0;
@@ -145,6 +160,7 @@ float   waveform_peak_scaled = 0.0;
 int32_t dc_offset_sum = 0;
 bool    silence = false;
 float   silent_scale = 1.0;
+float   current_punch = 0.0;
 
 // ------------------------------------------------------------
 // Sweet Spot (i2s_audio.h, led_utilities.h) ------------------
@@ -164,12 +180,16 @@ uint16_t noise_iterations = 0;
 // Display buffers (led_utilities.h) --------------------------
 
 CRGB leds[128];
+CRGB leds_frame_blending[128];
+CRGB leds_fx[128];
 CRGB leds_temp[128];
 CRGB leds_last[128];
 CRGB leds_aux [128];
 CRGB leds_fade[128];
 
 CRGB *leds_out;
+
+float hue_shift = 0.0; // Used in auto color cycling
 
 uint8_t dither_step = 0;
 bool led_thread_halt = false;
@@ -227,6 +247,7 @@ bool stream_max_mags = false;
 bool stream_max_mags_followers = false;
 bool stream_magnitudes = false;
 bool stream_spectrogram = false;
+bool stream_chromagram = false;
 
 bool debug_mode = false;
 uint64_t chip_id = 0;
@@ -278,8 +299,3 @@ bool msc_update_started = false;
 
 float MASTER_BRIGHTNESS = 0.0;
 float last_sample = 0;
-
-float retro_bulbs[NUM_FREQS]        = {0};
-float retro_heat_targets[NUM_FREQS] = {0};
-
-float scale_scores[24] = {0.0};

@@ -58,11 +58,11 @@
 // Obscure audio magic happens here
 void IRAM_ATTR process_GDFT() {
   static bool interlace_flip = false;
-  interlace_flip = !interlace_flip; // Switch field every frame on lower notes to save execution time
-  
+  interlace_flip = !interlace_flip;  // Switch field every frame on lower notes to save execution time
+
   // Reset magnitude caps every frame
   for (uint8_t i = 0; i < NUM_ZONES; i++) {
-    max_mags[i] = CONFIG.MAGNITUDE_FLOOR;  // Higher than the average noise floor
+    max_mags[i] = CONFIG.MAGNITUDE_FLOOR / CONFIG.SENSITIVITY;  // Higher than the average noise floor
   }
 
   // Increment spectrogram history index
@@ -73,10 +73,10 @@ void IRAM_ATTR process_GDFT() {
 
   // Run GDFT (Goertzel-based Discrete Fourier Transform) with 64 frequencies
   // Fixed-point code adapted from example here: https://sourceforge.net/p/freetel/code/HEAD/tree/misc/goertzal/goertzal.c
-  for (uint16_t i = 0; i < NUM_FREQS; i++) { // Run 64 times
-    bool field = bitRead(i, 0); // odd or even
+  for (uint16_t i = 0; i < NUM_FREQS; i++) {  // Run 64 times
+    bool field = bitRead(i, 0);               // odd or even
 
-    // If note is part of field being rendered, is >= index 16, or is the first note 
+    // If note is part of field being rendered, is >= index 16, or is the first note
     if (field == interlace_flip || i >= 16) {
       int32_t q0, q1, q2;
       int64_t mult;
@@ -85,9 +85,10 @@ void IRAM_ATTR process_GDFT() {
       q2 = 0;
 
       float window_pos = 0.0;
-      for (uint16_t n = 0; n < frequencies[i].block_size; n++) { // Run Goertzel for "block_size" iterations
+      for (uint16_t n = 0; n < frequencies[i].block_size; n++) {  // Run Goertzel for "block_size" iterations
         int32_t sample = 0;
-        sample = ((int32_t)sample_window[SAMPLE_HISTORY_LENGTH - 1 - n] * (int32_t)window_lookup[uint16_t(window_pos)]) >> 16;
+        //sample = ((int32_t)sample_window[SAMPLE_HISTORY_LENGTH - 1 - n] * (int32_t)window_lookup[uint16_t(window_pos)]) >> 16;
+        sample = (int32_t)sample_window[SAMPLE_HISTORY_LENGTH - 1 - n];
         mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
         q0 = (sample >> 6) + (mult >> 14) - q2;
         q2 = q1;
@@ -97,7 +98,7 @@ void IRAM_ATTR process_GDFT() {
       }
 
       mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
-      magnitudes[i] = q2 * q2 + q1 * q1 - ((int32_t)(mult >> 14)) * q2; // Calculate raw magnitudes
+      magnitudes[i] = q2 * q2 + q1 * q1 - ((int32_t)(mult >> 14)) * q2;  // Calculate raw magnitudes
 
       // Normalize output
       magnitudes[i] *= float(frequencies[i].block_size_recip);
@@ -110,7 +111,7 @@ void IRAM_ATTR process_GDFT() {
       }
       magnitudes[i] *= prog;
 
-      if (magnitudes[i] < 0.0) { // Prevent negative values
+      if (magnitudes[i] < 0.0) {  // Prevent negative values
         magnitudes[i] = 0.0;
       }
     }
@@ -139,23 +140,27 @@ void IRAM_ATTR process_GDFT() {
       }
     }
     noise_iterations++;
-    if (noise_iterations >= 256) { // Calibration complete
+    if (noise_iterations >= 1024) {  // Calibration complete
       noise_complete = true;
       USBSerial.println("NOISE CAL COMPLETE");
-      CONFIG.DC_OFFSET = dc_offset_sum / 256.0; // Calculate average DC offset and store it
-      save_ambient_noise_calibration(); // Save results to noise_cal.bin
-      save_config(); // Save config to config.bin
+      CONFIG.DC_OFFSET = dc_offset_sum / 1024.0;  // Calculate average DC offset and store it
+      save_ambient_noise_calibration();           // Save results to noise_cal.bin
+      save_config();                              // Save config to config.bin
     }
   }
 
   // Apply noise reduction data, estimate max values
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
     if (noise_complete == true) {
-      magnitudes[i] -= noise_samples[i] * 1.2; // Treat noise 1.2x louder than calibration
+      magnitudes[i] -= noise_samples[i] * 1.5;  // Treat noise 1.5x louder than calibration
       if (magnitudes[i] < 0.0) {
         magnitudes[i] = 0.0;
       }
     }
+  }
+
+  for (uint8_t i = 0; i < NUM_FREQS; i++) {
+    //magnitudes[i] *= magnitude_scale;
 
     mag_targets[i] = magnitudes[i];
     if (mag_targets[i] > max_mags[frequencies[i].zone]) {
@@ -236,12 +241,12 @@ void IRAM_ATTR process_GDFT() {
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
     if (mag_targets[i] > mag_followers[i]) {
       float delta = mag_targets[i] - mag_followers[i];
-      mag_followers[i] += delta * (smoothing_follower * 0.45);
+      mag_followers[i] += delta * (smoothing_follower * 0.65);
     }
 
     else if (mag_targets[i] < mag_followers[i]) {
       float delta = mag_followers[i] - mag_targets[i];
-      mag_followers[i] -= delta * (smoothing_follower * 0.55);
+      mag_followers[i] -= delta * (smoothing_follower * 0.75);
     }
   }
 
@@ -250,11 +255,11 @@ void IRAM_ATTR process_GDFT() {
   for (uint8_t i = 0; i < NUM_ZONES; i++) {
     if (max_mags[i] > max_mags_followers[i]) {
       float delta = max_mags[i] - max_mags_followers[i];
-      max_mags_followers[i] += delta * 0.05;
+      max_mags_followers[i] += delta * 0.0125;
     }
     if (max_mags[i] < max_mags_followers[i]) {
       float delta = max_mags_followers[i] - max_mags[i];
-      max_mags_followers[i] -= delta * 0.05;
+      max_mags_followers[i] -= delta * 0.0125;
     }
   }
 
@@ -269,11 +274,20 @@ void IRAM_ATTR process_GDFT() {
     USBSerial.println("))");
   }
 
+  float max_mag = CONFIG.MAGNITUDE_FLOOR / CONFIG.SENSITIVITY;
+  for (uint8_t i = 0; i < NUM_ZONES; i++) {
+    if (max_mags_followers[i] > max_mag) {
+      max_mag = max_mags_followers[i];
+    }
+  }
+
   // Make Spectrogram from raw magnitudes
   for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
     // Normalize our frequency bins to 0.0-1.0 range, which acts like an audio compressor at the same time
     float max_mag = interpolate(i / float(NUM_FREQS), max_mags_followers, NUM_ZONES);
     float mag_float = mag_followers[i] / max_mag;
+
+    //mag_float *= 2.0;
 
     // Restrict range, allowing for clipped values at peaks and valleys
     if (mag_float < 0.0) {
@@ -286,37 +300,50 @@ void IRAM_ATTR process_GDFT() {
     mag_float = mag_float * (1.0 - smoothing_exp_average) + mag_float_last[i] * smoothing_exp_average;
     mag_float_last[i] = mag_float;
 
-    mag_float *= (CONFIG.GAIN);
+    //mag_float *= (CONFIG.GAIN);
     if (mag_float > 1.0) {
       mag_float = 1.0;
     }
 
+    mag_float = sqrt(sqrt(mag_float));
+
     note_spectrogram[i] = mag_float;                                          // This array is the current value
     spectrogram_history[spectrogram_history_index][i] = note_spectrogram[i];  // This array is the value's history
   }
+}
 
+float calc_punch(uint8_t low_bin, uint8_t high_bin) {
+  const float push_max = 100000.0;
+  float punch_pos_decay = 0.0;
 
-  // Make Chromagram
-  chromagram_max_val = 0.0;
-  for (uint8_t i = 0; i < 12; i++) {
-    note_chromagram[i] = 0;
-  }
-  for (uint8_t octave = 0; octave < 6; octave++) {
-    for (uint8_t note = 0; note < 12; note++) {
-      uint16_t note_index = 12 * octave + note;
-      if (note_index < NUM_FREQS && note_index < CONFIG.CHROMAGRAM_RANGE) {
-        note_chromagram[note] += note_spectrogram[note_index] * 0.5;
+  float smoothing = 0.128;
+  float punch_pos = 0.0;
 
-        if (note_chromagram[note] > 1.0) {
-          note_chromagram[note] = 1.0;
-        }
+  float punch_scaling = NUM_FREQS / (high_bin - low_bin);
 
-        if (note_chromagram[note] > chromagram_max_val) {
-          chromagram_max_val = note_chromagram[note];
-        }
-      }
+  for (uint8_t i = low_bin; i < high_bin; i++) {
+    float delta = spectrogram_history[2][i] * spectrogram_history[2][i] - spectrogram_history[0][i] * spectrogram_history[0][i];
+    if (delta < 0.0) {
+      delta = 0.0;
     }
+    punch_pos += (delta * punch_scaling);
   }
+
+  if (punch_pos > 1.0) {
+    punch_pos = 1.0;
+  }
+
+  float punch_pos_smooth = 0.0;
+  punch_pos_smooth = punch_pos * (smoothing) + punch_pos_smooth * (1.0 - smoothing);
+
+  punch_pos_decay *= 0.9;
+
+  if (punch_pos_smooth > punch_pos_decay) {
+    punch_pos_decay = punch_pos_smooth;
+  }
+
+  float punch = push_max * (punch_pos_decay * punch_pos_decay * punch_pos_decay * punch_pos_decay * punch_pos_decay);
+  return punch;
 }
 
 void lookahead_smoothing() {
@@ -372,6 +399,40 @@ void lookahead_smoothing() {
     note_spectrogram_long_term[i] = (note_spectrogram_long_term[i] * 0.95) + (note_spectrogram_smooth[i] * 0.05);
   }
 
+  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
+    //note_spectrogram_smooth[i] = (note_spectrogram_smooth[i] + note_spectrogram_smooth_frame_blending[i]) * 0.5;
+
+    if (note_spectrogram_smooth[i] > 1.0) {
+      note_spectrogram_smooth[i] = 1.0;
+    }
+
+    note_spectrogram_smooth_frame_blending[i] = note_spectrogram_smooth[i];
+  }
+
+  // Make Chromagram
+  chromagram_max_val = 0.0;
+  for (uint8_t i = 0; i < 12; i++) {
+    note_chromagram[i] = 0;
+  }
+
+  for (uint8_t octave = 0; octave < 6; octave++) {
+    for (uint8_t note = 0; note < 12; note++) {
+      uint16_t note_index = 12 * octave + note;
+      if (note_index < NUM_FREQS && note_index < CONFIG.CHROMAGRAM_RANGE) {
+        if (note_spectrogram_smooth[note_index] > note_chromagram[note]) {
+          note_chromagram[note] = note_spectrogram_smooth[note_index];
+        }
+
+        if (note_chromagram[note] > chromagram_max_val) {
+          chromagram_max_val = note_chromagram[note];
+        }
+      }
+    }
+  }
+
+  // Calculate "punch" of the full frequency range (used by auto color-cycling)
+  current_punch = calc_punch(0, NUM_FREQS);  // (lightshow_modes.h)
+
   if (stream_spectrogram == true) {
     if (serial_iter >= 2) {  // Don't print every frame
       serial_iter = 0;
@@ -380,6 +441,21 @@ void lookahead_smoothing() {
         uint16_t bin = 999 * note_spectrogram_smooth[i];
         USBSerial.print(bin);
         if (i < NUM_FREQS - 1) {
+          USBSerial.print(',');
+        }
+      }
+      USBSerial.println("))");
+    }
+  }
+
+  if (stream_chromagram == true) {
+    if (serial_iter >= 2) {  // Don't print every frame
+      serial_iter = 0;
+      USBSerial.print("sbs((chromagram=");
+      for (uint16_t i = 0; i < 12; i++) {
+        uint16_t bin = 999 * note_chromagram[i];
+        USBSerial.print(bin);
+        if (i < 12 - 1) {
           USBSerial.print(',');
         }
       }
