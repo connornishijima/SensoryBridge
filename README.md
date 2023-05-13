@@ -6,7 +6,7 @@ For the latest stable release of the Sensory Bridge firmware, **[visit the Relea
 
 --------------------------------------------------------
 
-[![CLICK HERE TO SEE A VIDEO DEMO](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/6.jpg?raw=true)](https://www.youtube.com/watch?v=4ALef1g3c2c)
+https://github.com/connornishijima/SensoryBridge/assets/5051485/4ac0c42b-fbc8-497f-87ef-c4ed89d0dcf0
 
 # SENSORY BRIDGE is **DIFFERENT**
 
@@ -174,5 +174,3 @@ The **[GETTING STARTED](https://sensorybridge.rocks/tutorial/) GUIDE** will walk
 # **CREDITS**
 
 Developed by Connor Nishijima for Lixie Labs (2022)
-
-https://github.com/connornishijima/SensoryBridge/assets/5051485/4ac0c42b-fbc8-497f-87ef-c4ed89d0dcf0
