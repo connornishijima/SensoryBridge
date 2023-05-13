@@ -1,11 +1,3 @@
---------------------------------------------------------
-
-### NOTE: This repo is used for active development.
-
-For the latest stable release of the Sensory Bridge firmware, **[visit the Releases page](https://github.com/connornishijima/SensoryBridge/releases)**! (Cloning straight from this repo is much like a "nightly" build, and may be broken code!)
-
---------------------------------------------------------
-
 https://github.com/connornishijima/SensoryBridge/assets/5051485/4ac0c42b-fbc8-497f-87ef-c4ed89d0dcf0
 
 # SENSORY BRIDGE is **DIFFERENT**
@@ -106,6 +98,14 @@ While compatible with any WS2812B or APA102/SK9822-based LED strip (just use the
 ![SENSORY BRIDGE IS OPEN](https://github.com/connornishijima/SensoryBridge/blob/main/extras/img/1.jpg?raw=true)
 
 # SENSORY BRIDGE is **OPEN**
+
+--------------------------------------------------------
+
+### NOTE: This repo is used for active development.
+
+For the latest stable release of the Sensory Bridge firmware, **[visit the Releases page](https://github.com/connornishijima/SensoryBridge/releases)**! (Cloning straight from this repo is much like a "nightly" build, and may be broken code!)
+
+--------------------------------------------------------
 
 Powered by an ESP32-S2, Sensory Bridge can be easily reprogrammed for any purpose you'd like! The firmware is [open source](https://github.com/connornishijima/SensoryBridge) under the [MIT License](https://github.com/connornishijima/SensoryBridge/blob/main/LICENSE), so modifying it for your own purposes is quick and easy with the Arduino IDE. You can even download the [board](https://github.com/connornishijima/SensoryBridge/tree/main/extras/OSHW/PCB) and [case STLs](https://github.com/connornishijima/SensoryBridge/tree/main/extras/OSHW/3D%20Printing) to build one yourself!
 
