@@ -174,3 +174,5 @@ The **[GETTING STARTED](https://sensorybridge.rocks/tutorial/) GUIDE** will walk
 # **CREDITS**
 
 Developed by Connor Nishijima for Lixie Labs (2022)
+
+https://github.com/connornishijima/SensoryBridge/assets/5051485/4ac0c42b-fbc8-497f-87ef-c4ed89d0dcf0
