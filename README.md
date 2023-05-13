@@ -1,4 +1,4 @@
-https://github.com/connornishijima/SensoryBridge/assets/5051485/4ac0c42b-fbc8-497f-87ef-c4ed89d0dcf0
+https://github.com/connornishijima/SensoryBridge/assets/5051485/211737f4-0c69-49b0-99c4-2fa3d6a7a65e
 
 # SENSORY BRIDGE is **DIFFERENT**
 
