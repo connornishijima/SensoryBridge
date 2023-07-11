@@ -4,10 +4,17 @@
 
 extern void reboot(); // system.h
 
+void update_config_filename(uint32_t input) {
+  snprintf(config_filename, 24, "/CONFIG_%05lu.BIN", input);
+}
+
 // Restore all defaults defined in globals.h by removing saved data and rebooting
 void factory_reset() {
-  USBSerial.print("Deleting config.bin: ");
-  if (LittleFS.remove("/config.bin")) {
+  USBSerial.print("Deleting ");
+  USBSerial.print(config_filename);
+  USBSerial.print(": ");
+
+  if (LittleFS.remove(config_filename)) {
     USBSerial.println("file deleted");
   } else {
     USBSerial.println("delete failed");
@@ -25,8 +32,11 @@ void factory_reset() {
 
 // Restore only configuration defaults
 void restore_defaults() {
-  USBSerial.print("Deleting config.bin: ");
-  if (LittleFS.remove("/config.bin")) {
+  USBSerial.print("Deleting ");
+  USBSerial.print(config_filename);
+  USBSerial.print(": ");
+
+  if (LittleFS.remove(config_filename)) {
     USBSerial.println("file deleted");
   } else {
     USBSerial.println("delete failed");
@@ -40,23 +50,27 @@ void save_config() {
   if (debug_mode) {
     USBSerial.print("LITTLEFS: ");
   }
-  File file = LittleFS.open("/config.bin", FILE_WRITE);
+  File file = LittleFS.open(config_filename, FILE_WRITE);
   if (!file) {
     if (debug_mode) {
-      USBSerial.println("Failed to open config.bin for writing!");
+      USBSerial.print("Failed to open ");
+      USBSerial.print(config_filename);
+      USBSerial.println(" for writing!");
     }
     return;
   } else {
     file.seek(0);
-    uint8_t config_buffer[128];
+    uint8_t config_buffer[512];
     memcpy(config_buffer, &CONFIG, sizeof(CONFIG));
 
-    for (uint8_t i = 0; i < 128; i++) {
+    for (uint16_t i = 0; i < 512; i++) {
       file.write(config_buffer[i]);
     }
 
     if (debug_mode) {
-      USBSerial.println("WROTE CONFIG SUCCESSFULLY");
+      USBSerial.print("WROTE ");
+      USBSerial.print(config_filename);
+      USBSerial.println(" SUCCESSFULLY");
     }
   }
   file.close();
@@ -64,7 +78,10 @@ void save_config() {
 
 // Save configuration to LittleFS 10 seconds from now
 void save_config_delayed() {
-  last_setting_change = millis();
+  if(debug_mode == true){
+    USBSerial.println("CONFIG SAVE QUEUED");
+  }
+  next_save_time = millis()+5000;
   settings_updated = true;
 }
 
@@ -75,16 +92,18 @@ void load_config() {
   }
 
   bool queue_factory_reset = false;
-  File file = LittleFS.open("/config.bin", FILE_READ);
+  File file = LittleFS.open(config_filename, FILE_READ);
   if (!file) {
     if (debug_mode) {
-      USBSerial.println("Failed to open config.bin for reading!");
+      USBSerial.print("Failed to open ");
+      USBSerial.print(config_filename);
+      USBSerial.println(" for reading!");
     }
     return;
   } else {
     file.seek(0);
-    uint8_t config_buffer[256];
-    for (uint8_t i = 0; i < sizeof(CONFIG); i++) {
+    uint8_t config_buffer[512];
+    for (uint16_t i = 0; i < sizeof(CONFIG); i++) {
       config_buffer[i] = file.read();
     }
 
@@ -118,7 +137,7 @@ void save_ambient_noise_calibration() {
 
   file.seek(0);
   for (uint16_t i = 0; i < NUM_FREQS; i++) {
-    float in_val = noise_samples[i];
+    float in_val = float(noise_samples[i]);
 
     temp.long_val_float = in_val;
 
@@ -156,7 +175,7 @@ void load_ambient_noise_calibration() {
     temp.bytes[2] = file.read();
     temp.bytes[3] = file.read();
 
-    noise_samples[i] = temp.long_val_float;
+    noise_samples[i] = SQ15x16(temp.long_val_float);
   }
 
   file.close();
@@ -169,6 +188,8 @@ void load_ambient_noise_calibration() {
 void init_fs() {
   USBSerial.print("INIT FILESYSTEM: ");
   USBSerial.println(LittleFS.begin(true) == true ? PASS : FAIL);
+
+  update_config_filename(FIRMWARE_VERSION);
 
   load_ambient_noise_calibration();
   load_config();

@@ -4,28 +4,15 @@
 
 #include <driver/i2s.h>
 
-#if defined(CONFIG_IDF_TARGET_ESP32S2)
 const i2s_config_t i2s_config = { // Many of these settings are defined in (constants.h)
   .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
   .sample_rate = CONFIG.SAMPLE_RATE,
   .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
   .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
   .communication_format = (i2s_comm_format_t) (I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
-  .dma_buf_count = 1024 / (CONFIG.SAMPLES_PER_CHUNK * 2),
-  .dma_buf_len = CONFIG.SAMPLES_PER_CHUNK * 2
-};
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
-const i2s_config_t i2s_config = { // Many of these settings are defined in (constants.h)
-  .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
-  .sample_rate = CONFIG.SAMPLE_RATE,
-  .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
-  .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-  .communication_format = (i2s_comm_format_t) (I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
-  .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-  .dma_buf_count = 1024 / CONFIG.SAMPLES_PER_CHUNK,
+  .dma_buf_count = 2,
   .dma_buf_len = CONFIG.SAMPLES_PER_CHUNK
 };
-#endif
 
 const i2s_pin_config_t pin_config = { // These too
   .bck_io_num   = I2S_BCLK_PIN,
@@ -145,7 +132,7 @@ void acquire_sample_chunk(uint32_t t_now) {
     // +1 is the right. See run_sweet_spot() in led_utilities.h
     // for how this value translates to the final LED brightnesses
 
-    if (max_waveform_val_raw <= CONFIG.SWEET_SPOT_MIN_LEVEL * 0.95) {
+    if (max_waveform_val_raw <= CONFIG.SWEET_SPOT_MIN_LEVEL * 1.10) {
       sweet_spot_state = -1;
       if (sweet_spot_state_last != -1) { // Just became silent
         silence_temp = true;
@@ -194,6 +181,71 @@ void acquire_sample_chunk(uint32_t t_now) {
       sample_window[i] = waveform[i - (SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK)];
     }
 
+    for(uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++){
+      waveform_fixed_point[i] = SQ15x16(waveform[i]) / SQ15x16(32768.0);
+    }
+
     sweet_spot_state_last = sweet_spot_state;
   }
+}
+
+void calculate_vu() {
+    /*
+    Calculates perceived audio loudness or Volume Unit (VU). Uses root mean square (RMS) method 
+    for accurate representation of perceived loudness and incorporates a noise floor calibration.
+    If calibration is active, updates noise floor level. If not, subtracts the noise floor from
+    the calculated volume and normalizes the volume level.
+
+    Parameters:
+    - audio_samples[]: Audio samples to process.
+    - sample_count: Number of samples in audio_samples array.
+
+    Global variables:
+    - audio_vu_level: Current VU level.
+    - audio_vu_level_last: Last calculated VU level.
+    - CONFIG.VU_LEVEL_FLOOR: Quietest level considered as audio signal.
+    - audio_vu_level_average: Average of the current and the last VU level.
+    - noise_cal_active: Indicator of active noise floor calibration.
+    */
+
+    SQ15x16 sample_count = CONFIG.SAMPLES_PER_CHUNK;
+
+    // Store last volume level
+    audio_vu_level_last = audio_vu_level;
+    
+    SQ15x16 sum = 0.0;
+
+    // Compute sum of squares
+    for(uint16_t i = 0; i < sample_count; i++) {
+        sum += waveform_fixed_point[i] * waveform_fixed_point[i];
+    }
+
+    // Compute RMS
+    SQ15x16 rms = sqrt(float(sum / sample_count));
+    
+    // Update volume level
+    audio_vu_level = rms;
+    
+    // Check noise calibration
+    if(noise_complete == false){
+        // If volume level exceeds noise floor, update noise floor
+        if(float(audio_vu_level*1.5) > CONFIG.VU_LEVEL_FLOOR){
+            CONFIG.VU_LEVEL_FLOOR = float(audio_vu_level*1.5);
+        }
+    }
+    else{
+        // Subtract noise floor from volume level
+        audio_vu_level -= CONFIG.VU_LEVEL_FLOOR;
+        
+        // Zero out negative volume
+        if(audio_vu_level < 0.0){
+            audio_vu_level = 0.0;
+        }
+       
+        // Normalize volume level
+        audio_vu_level /= (1.0-CONFIG.VU_LEVEL_FLOOR);
+    }
+
+    // Compute average volume level
+    audio_vu_level_average = (audio_vu_level+audio_vu_level_last) / SQ15x16(2.0);
 }

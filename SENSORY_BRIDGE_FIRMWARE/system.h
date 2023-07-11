@@ -103,17 +103,17 @@ void enable_usb_update_mode() {
 
   while (true) {
     for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
-      leds[i] = CRGB(0, 0, 0);
+      leds_16[i] = {0, 0, 0};
     }
 
     if (msc_update_started == false) {
-      leds[led_index] = CRGB(0, 0, 32);
+      leds_16[led_index] = {0, 0, 0.25};
       ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   sweet_order[sweet_index][0] * 512);
       ledcWrite(SWEET_SPOT_CENTER_CHANNEL, sweet_order[sweet_index][1] * 512);
       ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  sweet_order[sweet_index][2] * 512);
     }
     else {
-      leds[NATIVE_RESOLUTION-1-led_index] = CRGB(0, 32, 0);
+      leds_16[NATIVE_RESOLUTION-1-led_index] = {0, 0.25, 0};
       ledcWrite(SWEET_SPOT_LEFT_CHANNEL,   sweet_order[sweet_index][2] * 4095);
       ledcWrite(SWEET_SPOT_CENTER_CHANNEL, sweet_order[sweet_index][1] * 4095);
       ledcWrite(SWEET_SPOT_RIGHT_CHANNEL,  sweet_order[sweet_index][0] * 4095);
@@ -206,33 +206,53 @@ void generate_window_lookup() {
   end_timing();
 }
 
-void generate_frequency_data() {
-  start_timing("GENERATING GOERTZEL FREQUENCY ANALYSIS VARIABLES");
-  for (uint8_t i = 0; i < NUM_FREQS; i++) {
-    float prog = i / float(NUM_FREQS);
+void precompute_goertzel_constants() {
+  for (uint16_t i = 0; i < NUM_FREQS; i++) {
+    int16_t n = i;
+    frequencies[i].target_freq = notes[n + CONFIG.NOTE_OFFSET];
 
-    uint16_t note_index = i + CONFIG.NOTE_OFFSET;
-    uint16_t max_index = sizeof(notes) / sizeof(float);
+    float neighbor_left;
+    float neighbor_right;
 
-    if (note_index > max_index - 1) {
-      note_index = max_index - 1;
+    if (i == 0) {
+      neighbor_left = notes[n + CONFIG.NOTE_OFFSET];
+      neighbor_right = notes[n + CONFIG.NOTE_OFFSET + 1];
+    } else if (i == NUM_FREQS - 1) {
+      neighbor_left = notes[n + CONFIG.NOTE_OFFSET - 1];
+      neighbor_right = notes[n + CONFIG.NOTE_OFFSET];
+    } else {
+      neighbor_left = notes[n + CONFIG.NOTE_OFFSET - 1];
+      neighbor_right = notes[n + CONFIG.NOTE_OFFSET + 1];
     }
 
-    float block_size_mix = 1.0-sqrt(sqrt(prog));
+    float neighbor_left_distance_hz = fabs(neighbor_left - frequencies[i].target_freq);
+    float neighbor_right_distance_hz = fabs(neighbor_right - frequencies[i].target_freq);
+    float max_distance_hz = 0;
+    if (neighbor_left_distance_hz > max_distance_hz) {
+      max_distance_hz = neighbor_left_distance_hz;
+    }
+    if (neighbor_right_distance_hz > max_distance_hz) {
+      max_distance_hz = neighbor_right_distance_hz;
+    }
 
-    frequencies[i].target_freq = notes[note_index];
-    frequencies[i].block_size  = CONFIG.MAX_BLOCK_SIZE * block_size_mix + CONFIG.MIN_BLOCK_SIZE * (1.0-block_size_mix);
+    frequencies[i].block_size = CONFIG.SAMPLE_RATE / (max_distance_hz * 2.0);
+
+    if(frequencies[i].block_size > 2000){
+        frequencies[i].block_size = 2000;
+    }
+
     frequencies[i].block_size_recip = 1.0 / float(frequencies[i].block_size);
 
-    frequencies[i].zone = (i / float(NUM_FREQS)) * NUM_ZONES;
-
-    float w = 2.0 * PI * ((float)frequencies[i].target_freq / CONFIG.SAMPLE_RATE);
-    float coeff = 2.0 * cos(w);
+    float k = (int)(0.5 + ((frequencies[i].block_size * frequencies[i].target_freq) / CONFIG.SAMPLE_RATE));
+    float w = (2.0 * PI * k) / frequencies[i].block_size;
+    float cosine = cos(w);
+    float sine = sin(w);
+    float coeff = 2.0 * cosine;
     frequencies[i].coeff_q14 = (1 << 14) * coeff;
 
     frequencies[i].window_mult = 4096.0 / frequencies[i].block_size;
+    frequencies[i].zone = (i / float(NUM_FREQS)) * NUM_ZONES;
   }
-  end_timing();
 }
 
 void debug_function_timing(uint32_t t_now) {
@@ -296,7 +316,7 @@ void init_system() {
   init_p2p();
   generate_a_weights();
   generate_window_lookup();
-  generate_frequency_data();
+  precompute_goertzel_constants();
 
   USBSerial.println("SYSTEM INIT COMPLETE!");
 
@@ -344,7 +364,10 @@ void log_fps(uint32_t t_now_us) {
 // you're rapidly cycling through modes for example.
 void check_settings(uint32_t t_now) {
   if (settings_updated) {
-    if (t_now - last_setting_change >= 10000) {
+    if (t_now >= next_save_time) {
+      if(debug_mode == true){
+        USBSerial.println("QUEUED CONFIG SAVE TRIGGERED");
+      }
       save_config();
       settings_updated = false;
     }

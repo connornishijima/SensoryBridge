@@ -57,12 +57,17 @@
 
 // Obscure audio magic happens here
 void IRAM_ATTR process_GDFT() {
+  float MOOD_VAL = CONFIG.MOOD;
+  if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
+    MOOD_VAL = 1.0;
+  }
+
   static bool interlace_flip = false;
   interlace_flip = !interlace_flip;  // Switch field every frame on lower notes to save execution time
 
   // Reset magnitude caps every frame
   for (uint8_t i = 0; i < NUM_ZONES; i++) {
-    max_mags[i] = CONFIG.MAGNITUDE_FLOOR / CONFIG.SENSITIVITY;  // Higher than the average noise floor
+    max_mags[i] = 0.0;  // Higher than the average noise floor
   }
 
   // Increment spectrogram history index
@@ -74,48 +79,77 @@ void IRAM_ATTR process_GDFT() {
   // Run GDFT (Goertzel-based Discrete Fourier Transform) with 64 frequencies
   // Fixed-point code adapted from example here: https://sourceforge.net/p/freetel/code/HEAD/tree/misc/goertzal/goertzal.c
   for (uint16_t i = 0; i < NUM_FREQS; i++) {  // Run 64 times
-    bool field = bitRead(i, 0);               // odd or even
+    int32_t q0, q1, q2;
+    int64_t mult;
 
-    // If note is part of field being rendered, is >= index 16, or is the first note
-    if (field == interlace_flip || i >= 16) {
-      int32_t q0, q1, q2;
-      int64_t mult;
+    q1 = 0;
+    q2 = 0;
 
-      q1 = 0;
-      q2 = 0;
+    float window_pos = 0.0;
+    for (uint16_t n = 0; n < frequencies[i].block_size; n++) {  // Run Goertzel for "block_size" iterations    
+      int32_t sample = 0;
+      //sample = ((int32_t)sample_window[SAMPLE_HISTORY_LENGTH - 1 - n] * (int32_t)window_lookup[uint16_t(window_pos)]) >> 16;
+      sample = (int32_t)sample_window[SAMPLE_HISTORY_LENGTH - 1 - n];
+      mult = (int32_t)frequencies[i].coeff_q14 * (int32_t)q1;
+      q0 = (sample >> 6) + (mult >> 14) - q2;
+      q2 = q1;
+      q1 = q0;
 
-      float window_pos = 0.0;
-      for (uint16_t n = 0; n < frequencies[i].block_size; n++) {  // Run Goertzel for "block_size" iterations
-        int32_t sample = 0;
-        //sample = ((int32_t)sample_window[SAMPLE_HISTORY_LENGTH - 1 - n] * (int32_t)window_lookup[uint16_t(window_pos)]) >> 16;
-        sample = (int32_t)sample_window[SAMPLE_HISTORY_LENGTH - 1 - n];
-        mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
-        q0 = (sample >> 6) + (mult >> 14) - q2;
-        q2 = q1;
-        q1 = q0;
+      window_pos += frequencies[i].window_mult;
+    }
 
-        window_pos += frequencies[i].window_mult;
+    mult = (int32_t)frequencies[i].coeff_q14 * (int32_t)q1;
+    magnitudes[i] = q2 * q2 + q1 * q1 - ((int32_t)(mult >> 14)) * q2;  // Calculate raw magnitudes
+
+    if (magnitudes[i] < 0) {  // Prevent negative values
+      magnitudes[i] = 0;
+    }
+
+    magnitudes[i] = sqrt(magnitudes[i]);
+
+    // Normalizing the magnitude
+    float normalized_magnitude = magnitudes[i] / float(frequencies[i].block_size / 2.0);
+    magnitudes_normalized[i] = normalized_magnitude;
+
+    if (frequencies[i].target_freq == 440.0) {
+      //USBSerial.println(magnitudes_normalized[i]);
+    }
+
+    magnitudes_normalized_avg[i] = (magnitudes_normalized[i] * 0.3) + (magnitudes_normalized_avg[i] * (1.0 - 0.3));
+  }
+
+  // Gather noise data if noise_complete == false
+  if (noise_complete == false) {
+    for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
+      if (magnitudes_normalized_avg[i] > noise_samples[i]) {
+        noise_samples[i] = magnitudes_normalized_avg[i];
       }
+    }
+    noise_iterations++;
+    if (noise_iterations >= 256) {  // Calibration complete
+      noise_complete = true;
+      USBSerial.println("NOISE CAL COMPLETE");
+      CONFIG.DC_OFFSET = dc_offset_sum / 256.0;  // Calculate average DC offset and store it
+      save_ambient_noise_calibration();           // Save results to noise_cal.bin
+      save_config();                              // Save config to config.bin
+    }
+  }
 
-      mult = (int64_t)frequencies[i].coeff_q14 * (int64_t)q1;
-      magnitudes[i] = q2 * q2 + q1 * q1 - ((int32_t)(mult >> 14)) * q2;  // Calculate raw magnitudes
-
-      // Normalize output
-      magnitudes[i] *= float(frequencies[i].block_size_recip);
-
-      // Scale magnitudes this way to help even out the response curve further
-      float prog = i / float(NUM_FREQS);
-      prog *= prog;
-      if (prog < 0.1) {
-        prog = 0.1;
-      }
-      magnitudes[i] *= prog;
-
-      if (magnitudes[i] < 0.0) {  // Prevent negative values
-        magnitudes[i] = 0.0;
+  // Apply noise reduction data
+  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
+    if (noise_complete == true) {
+      magnitudes_normalized_avg[i] -= float(noise_samples[i] * SQ15x16(1.5));  // Treat noise 1.5x louder than calibration
+      if (magnitudes_normalized_avg[i] < 0.0) {
+        magnitudes_normalized_avg[i] = 0.0;
       }
     }
   }
+
+  memcpy(magnitudes_final, magnitudes_normalized_avg, sizeof(float) * NUM_FREQS);
+  low_pass_array(magnitudes_final, magnitudes_last, NUM_FREQS, SYSTEM_FPS, 1.0 + (10.0 * MOOD_VAL));
+  memcpy(magnitudes_last, magnitudes_final, sizeof(float) * NUM_FREQS);
+
+  /*
 
   // When enabled, streams magnitudes[] array over Serial
   if (stream_magnitudes == true) {
@@ -131,335 +165,79 @@ void IRAM_ATTR process_GDFT() {
       USBSerial.println("))");
     }
   }
+  */
 
-  // Gather noise data if noise_complete == false
-  if (noise_complete == false) {
-    for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-      if (magnitudes[i] > noise_samples[i]) {
-        noise_samples[i] = magnitudes[i];
-      }
-    }
-    noise_iterations++;
-    if (noise_iterations >= 1024) {  // Calibration complete
-      noise_complete = true;
-      USBSerial.println("NOISE CAL COMPLETE");
-      CONFIG.DC_OFFSET = dc_offset_sum / 1024.0;  // Calculate average DC offset and store it
-      save_ambient_noise_calibration();           // Save results to noise_cal.bin
-      save_config();                              // Save config to config.bin
+  static SQ15x16 goertzel_max_value = 0.0001;
+  SQ15x16 max_value = 0.00001;
+
+  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {  // 64 freqs
+    if (magnitudes_final[i] > max_value) {
+      max_value = magnitudes_final[i];
     }
   }
 
-  // Apply noise reduction data, estimate max values
-  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-    if (noise_complete == true) {
-      magnitudes[i] -= noise_samples[i] * 1.5;  // Treat noise 1.5x louder than calibration
-      if (magnitudes[i] < 0.0) {
-        magnitudes[i] = 0.0;
-      }
-    }
+  max_value *= SQ15x16(0.995);
+
+  if (max_value > goertzel_max_value) {
+    SQ15x16 delta = max_value - goertzel_max_value;
+    goertzel_max_value += delta * SQ15x16(0.0050);
+  } else if (goertzel_max_value > max_value) {
+    SQ15x16 delta = goertzel_max_value - max_value;
+    goertzel_max_value -= delta * SQ15x16(0.0025);
   }
 
-  for (uint8_t i = 0; i < NUM_FREQS; i++) {
-    //magnitudes[i] *= magnitude_scale;
-
-    mag_targets[i] = magnitudes[i];
-    if (mag_targets[i] > max_mags[frequencies[i].zone]) {
-      max_mags[frequencies[i].zone] = mag_targets[i];
-    }
+  if (goertzel_max_value < 4.0) {
+    goertzel_max_value = 4.0;
   }
 
-  if (stream_max_mags == true) {
-    USBSerial.print("sbs((max_mags=");
-    for (uint8_t i = 0; i < NUM_ZONES; i++) {
-      USBSerial.print(max_mags[i]);
-      if (i < NUM_ZONES - 1) {
-        USBSerial.print(',');
-      }
-    }
-    USBSerial.println("))");
-  }
+  // Normalize output using goertzel_max_val
+  SQ15x16 multiplier = SQ15x16(1.0) / goertzel_max_value;
+  //multiplier += SQ15x16(0.10);  // Overshoot by 10%
 
-  // Two different algorithms are used to smooth the display output:
-  //
-  // Smoothing Type A: "Followers"
-  // -----------------------------
-  // The live magnitudes are stored in an array (mag_targets[])
-  // These are the most recent values, and can fluctuate wildly.
-  //
-  // A second array of magnitude bins (mag_followers[]) also exists.
-  //
-  // On each frame, the difference (delta) between mag_targets[i]
-  // and mag_followers[i] is calculated. mag_followers[i] is
-  // incremented or decremented by (delta * amount) - amount being
-  // a value between 0.0 and 1.0. Scaling the amount that the
-  // follower is able to change per frame limits its speed and
-  // makes its approach to the destination value non-linear.
-  //
-  // With the "amount" set to only 0.5, the mag_followers[] array
-  // is only allowed to change by half the amount (on each frame)
-  // that the targets array could. This slows down rapid transient
-  // changes, adding a viscous smoothing effect that's slower to
-  // track on as it gets closer to the target value.
-  //
-  //
-  // Smoothing Type B: "Exponential Averaging"
-  // -----------------------------------------
-  // This one you might have heard of. Here's how it's implemented here,
-  // with smoothing set to 0.9 (a high amount) as an example:
-  //
-  // smooth_frame = new_frame * (1.0-smoothing) + last_frame * smoothing;
-  //
-  // This takes the new data, scales it to 10% its original range,
-  // scales the output of the last frame to 90% its original range,
-  // and sums the two. Afterwards, the result is stored in "last_frame"
-  // for the next run.
-  //
-  // This method is applied later, in the // Make Spectrogram section,
-  // and is good for smoothing rapid changes but severly restricts the
-  // percieved reaction time of the display.
-  //
-  //
-  // The two smoothing algorithms are applied differently based on the MOOD knob position:
-  // +---------------------------+-----------------+-----------------+----------------------------------------------------+
-  // |  KNOB POSITION            |  TYPE A AMOUNT  |  TYPE B AMOUNT  |  EFFECT                                            |
-  // +---------------------------+-----------------+-----------------+----------------------------------------------------+
-  // |  0% (all the way left)    |  100%           |  100%           |  EXTREMELY SMOOTH, HIGHER LATENCY                  |
-  // |  25%                      |  50%            |  100%           |                                                    |
-  // |  50% (middle)             |  0%             |  100%           |  GOOD BALANCE, LOW LATENCY                         |
-  // |  75%                      |  0%             |  50%            |                                                    |
-  // |  100% (all the way right) |  0%             |  0%             |  FASTEST LED REACTION TIME, "NO" SMOOTHING, HARSH  |
-  // +---------------------------+-----------------+-----------------+----------------------------------------------------+
-  //
-  // There's also some extra math so that smoothing values don't actually reach 0% (no change allowed per frame)
-  // (So the 0% - 100% range of this chart is mostly representative)
-
-  // These two upcoming variables are calculated in knobs.h:
-  //   float smoothing_follower
-  //   float smoothing_exp_average
-
-  // Smooth GDFT changes with MOOD knob value ("Follower" algorithm)
-  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-    if (mag_targets[i] > mag_followers[i]) {
-      float delta = mag_targets[i] - mag_followers[i];
-      mag_followers[i] += delta * (smoothing_follower * 0.65);
-    }
-
-    else if (mag_targets[i] < mag_followers[i]) {
-      float delta = mag_followers[i] - mag_targets[i];
-      mag_followers[i] -= delta * (smoothing_follower * 0.75);
-    }
-  }
-
-  // The max_mags[] array is subject to the same type of smoothing,
-  // hardcoded to 0.075.
-  for (uint8_t i = 0; i < NUM_ZONES; i++) {
-    if (max_mags[i] > max_mags_followers[i]) {
-      float delta = max_mags[i] - max_mags_followers[i];
-      max_mags_followers[i] += delta * 0.0125;
-    }
-    if (max_mags[i] < max_mags_followers[i]) {
-      float delta = max_mags_followers[i] - max_mags[i];
-      max_mags_followers[i] -= delta * 0.0125;
-    }
-  }
-
-  if (stream_max_mags_followers == true) {
-    USBSerial.print("sbs((max_mags_followers=");
-    for (uint8_t i = 0; i < NUM_ZONES; i++) {
-      USBSerial.print(max_mags_followers[i]);
-      if (i < NUM_ZONES - 1) {
-        USBSerial.print('\t');
-      }
-    }
-    USBSerial.println("))");
-  }
-
-  float max_mag = CONFIG.MAGNITUDE_FLOOR / CONFIG.SENSITIVITY;
-  for (uint8_t i = 0; i < NUM_ZONES; i++) {
-    if (max_mags_followers[i] > max_mag) {
-      max_mag = max_mags_followers[i];
-    }
-  }
-
-  // Make Spectrogram from raw magnitudes
-  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-    // Normalize our frequency bins to 0.0-1.0 range, which acts like an audio compressor at the same time
-    float max_mag = interpolate(i / float(NUM_FREQS), max_mags_followers, NUM_ZONES);
-    float mag_float = mag_followers[i] / max_mag;
-
-    //mag_float *= 2.0;
-
-    // Restrict range, allowing for clipped values at peaks and valleys
-    if (mag_float < 0.0) {
-      mag_float = 0.0;
-    } else if (mag_float > 1.0) {
-      mag_float = 1.0;
-    }
-
-    // Smooth spectrogram changes with MOOD knob value (Exp. Avg. smoothing)
-    mag_float = mag_float * (1.0 - smoothing_exp_average) + mag_float_last[i] * smoothing_exp_average;
-    mag_float_last[i] = mag_float;
-
-    //mag_float *= (CONFIG.GAIN);
-    if (mag_float > 1.0) {
-      mag_float = 1.0;
-    }
-
-    mag_float = sqrt(sqrt(mag_float));
-
-    note_spectrogram[i] = mag_float;                                          // This array is the current value
-    spectrogram_history[spectrogram_history_index][i] = note_spectrogram[i];  // This array is the value's history
+  for (uint16_t i = 0; i < NUM_FREQS; i += 1) {
+    spectrogram[i] = magnitudes_final[i] * multiplier;
   }
 }
 
-float calc_punch(uint8_t low_bin, uint8_t high_bin) {
-  const float push_max = 100000.0;
-  float punch_pos_decay = 0.0;
+void calculate_novelty(uint32_t t_now) {
+  static uint32_t iter = 0;
+  iter++;
 
-  float smoothing = 0.128;
-  float punch_pos = 0.0;
-
-  float punch_scaling = NUM_FREQS / (high_bin - low_bin);
-
-  for (uint8_t i = low_bin; i < high_bin; i++) {
-    float delta = spectrogram_history[2][i] * spectrogram_history[2][i] - spectrogram_history[0][i] * spectrogram_history[0][i];
-    if (delta < 0.0) {
-      delta = 0.0;
+  // Calculate "novelty" (positive change) in this moment by marking the positive changes from the previous frame
+  // Sum in a column-wise fashion into novelty_now
+  SQ15x16 novelty_now = 0.0;
+  for (uint16_t i = 0; i < NUM_FREQS; i++) {
+    int16_t rounded_index = spectral_history_index - 1;
+    while (rounded_index < 0) {
+      rounded_index += SPECTRAL_HISTORY_LENGTH;
     }
-    punch_pos += (delta * punch_scaling);
-  }
+    SQ15x16 novelty_bin = spectrogram[i] - spectral_history[rounded_index][i];
 
-  if (punch_pos > 1.0) {
-    punch_pos = 1.0;
-  }
-
-  float punch_pos_smooth = 0.0;
-  punch_pos_smooth = punch_pos * (smoothing) + punch_pos_smooth * (1.0 - smoothing);
-
-  punch_pos_decay *= 0.9;
-
-  if (punch_pos_smooth > punch_pos_decay) {
-    punch_pos_decay = punch_pos_smooth;
-  }
-
-  float punch = push_max * (punch_pos_decay * punch_pos_decay * punch_pos_decay * punch_pos_decay * punch_pos_decay);
-  return punch;
-}
-
-void lookahead_smoothing() {
-  // This one is weird too, let's talk.
-  //
-  // Output to the LEDs is delayed by 2 frames. This is virtually
-  // invisible to the naked eye at these speeds, and allows this
-  // function to look ahead and do this:
-  //
-  // IF
-  // The next frame will have a decreased value (or opposite)
-  // AND
-  // The frame after that will have an increased value again  (or opposite)
-  // THEN
-  // The next frame should just become an average of the current
-  // and the "after next" frame to prevent that rapid change
-  // from making to to the LEDs.
-  //
-  // This reduces (FPS/2)Hz flicker, especially at lower brightness
-  // frequency bins.
-
-  int16_t past_index = spectrogram_history_index - 2;
-  if (past_index < 0) {
-    past_index += spectrogram_history_length;
-  }
-
-  int16_t look_ahead_1 = spectrogram_history_index - 1;
-  if (look_ahead_1 < 0) {
-    look_ahead_1 += spectrogram_history_length;
-  }
-
-  int16_t look_ahead_2 = spectrogram_history_index - 0;
-  if (look_ahead_2 < 0) {
-    look_ahead_2 += spectrogram_history_length;
-  }
-
-  for (uint8_t i = 0; i < NUM_FREQS; i += 1) {
-    bool look_ahead_1_rising = false;
-    bool look_ahead_2_rising = false;
-
-    if (spectrogram_history[look_ahead_1][i] > spectrogram_history[past_index][i]) {
-      look_ahead_1_rising = true;
-    }
-    if (spectrogram_history[look_ahead_2][i] > spectrogram_history[look_ahead_1][i]) {
-      look_ahead_2_rising = true;
+    if (novelty_bin < 0.0) {
+      novelty_bin = 0.0;
     }
 
-    if (look_ahead_1_rising != look_ahead_2_rising) {  // if spike, set spike frame to average of neighbors
-      spectrogram_history[look_ahead_1][i] = (spectrogram_history[past_index][i] + spectrogram_history[look_ahead_2][i]) / 2.0;
-    }
+    novelty_now += novelty_bin;
+  }
+  novelty_now /= NUM_FREQS;  // Normalize result
 
-    note_spectrogram_smooth[i] = spectrogram_history[past_index][i];
-    note_spectrogram_long_term[i] = (note_spectrogram_long_term[i] * 0.95) + (note_spectrogram_smooth[i] * 0.05);
+  // Append current spectrogram to last place in history:
+  for (uint16_t b = 0; b < NUM_FREQS; b += 8) {
+    spectral_history[spectral_history_index][b + 0] = spectrogram[b + 0];
+    spectral_history[spectral_history_index][b + 1] = spectrogram[b + 1];
+    spectral_history[spectral_history_index][b + 2] = spectrogram[b + 2];
+    spectral_history[spectral_history_index][b + 3] = spectrogram[b + 3];
+    spectral_history[spectral_history_index][b + 4] = spectrogram[b + 4];
+    spectral_history[spectral_history_index][b + 5] = spectrogram[b + 5];
+    spectral_history[spectral_history_index][b + 6] = spectrogram[b + 6];
+    spectral_history[spectral_history_index][b + 7] = spectrogram[b + 7];
   }
 
-  for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
-    //note_spectrogram_smooth[i] = (note_spectrogram_smooth[i] + note_spectrogram_smooth_frame_blending[i]) * 0.5;
+  // Append new novelty measurement to novelty curve history
+  novelty_curve[spectral_history_index] = sqrt(float(novelty_now));
 
-    if (note_spectrogram_smooth[i] > 1.0) {
-      note_spectrogram_smooth[i] = 1.0;
-    }
-
-    note_spectrogram_smooth_frame_blending[i] = note_spectrogram_smooth[i];
-  }
-
-  // Make Chromagram
-  chromagram_max_val = 0.0;
-  for (uint8_t i = 0; i < 12; i++) {
-    note_chromagram[i] = 0;
-  }
-
-  for (uint8_t octave = 0; octave < 6; octave++) {
-    for (uint8_t note = 0; note < 12; note++) {
-      uint16_t note_index = 12 * octave + note;
-      if (note_index < NUM_FREQS && note_index < CONFIG.CHROMAGRAM_RANGE) {
-        if (note_spectrogram_smooth[note_index] > note_chromagram[note]) {
-          note_chromagram[note] = note_spectrogram_smooth[note_index];
-        }
-
-        if (note_chromagram[note] > chromagram_max_val) {
-          chromagram_max_val = note_chromagram[note];
-        }
-      }
-    }
-  }
-
-  // Calculate "punch" of the full frequency range (used by auto color-cycling)
-  current_punch = calc_punch(0, NUM_FREQS);  // (lightshow_modes.h)
-
-  if (stream_spectrogram == true) {
-    if (serial_iter >= 2) {  // Don't print every frame
-      serial_iter = 0;
-      USBSerial.print("sbs((spectrogram=");
-      for (uint16_t i = 0; i < NUM_FREQS; i++) {
-        uint16_t bin = 999 * note_spectrogram_smooth[i];
-        USBSerial.print(bin);
-        if (i < NUM_FREQS - 1) {
-          USBSerial.print(',');
-        }
-      }
-      USBSerial.println("))");
-    }
-  }
-
-  if (stream_chromagram == true) {
-    if (serial_iter >= 2) {  // Don't print every frame
-      serial_iter = 0;
-      USBSerial.print("sbs((chromagram=");
-      for (uint16_t i = 0; i < 12; i++) {
-        uint16_t bin = 999 * note_chromagram[i];
-        USBSerial.print(bin);
-        if (i < 12 - 1) {
-          USBSerial.print(',');
-        }
-      }
-      USBSerial.println("))");
-    }
+  spectral_history_index++;
+  if (spectral_history_index >= SPECTRAL_HISTORY_LENGTH) {
+    spectral_history_index -= SPECTRAL_HISTORY_LENGTH;
   }
 }

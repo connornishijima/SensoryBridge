@@ -5,7 +5,7 @@ void set_preset(char* preset_name) {
     CONFIG.SQUARE_ITER = 1;
     CONFIG.INCANDESCENT_FILTER = 0.80;
     CONFIG.INCANDESCENT_MODE = false;
-    CONFIG.BACKDROP_BRIGHTNESS = 0.00;
+    CONFIG.BASE_COAT = true;
     CONFIG.BULB_OPACITY = 0.0;
     CONFIG.SATURATION = 1.0;
   }
@@ -14,7 +14,7 @@ void set_preset(char* preset_name) {
     CONFIG.SQUARE_ITER = 1;
     CONFIG.INCANDESCENT_FILTER = 0.80;
     CONFIG.INCANDESCENT_MODE = false;
-    CONFIG.BACKDROP_BRIGHTNESS = 0.15;
+    CONFIG.BASE_COAT = false;
     CONFIG.BULB_OPACITY = 1.0;
     CONFIG.SATURATION = 1.0;
   }
@@ -23,7 +23,7 @@ void set_preset(char* preset_name) {
     CONFIG.SQUARE_ITER = 1;
     CONFIG.INCANDESCENT_FILTER = 1.0;
     CONFIG.INCANDESCENT_MODE = true;
-    CONFIG.BACKDROP_BRIGHTNESS = 0.0;
+    CONFIG.BASE_COAT = true;
     CONFIG.BULB_OPACITY = 0.0;
     CONFIG.SATURATION = 1.0;
   }
@@ -32,7 +32,7 @@ void set_preset(char* preset_name) {
     CONFIG.SQUARE_ITER = 1;
     CONFIG.INCANDESCENT_FILTER = 0;
     CONFIG.INCANDESCENT_MODE = false;
-    CONFIG.BACKDROP_BRIGHTNESS = 0.15;
+    CONFIG.BASE_COAT = true;
     CONFIG.BULB_OPACITY = 0.0;
     CONFIG.SATURATION = 0.0;
   }
@@ -41,7 +41,7 @@ void set_preset(char* preset_name) {
     CONFIG.SQUARE_ITER = 1;
     CONFIG.INCANDESCENT_FILTER = 0.0;
     CONFIG.INCANDESCENT_MODE = false;
-    CONFIG.BACKDROP_BRIGHTNESS = 0.00;
+    CONFIG.BASE_COAT = false;
     CONFIG.BULB_OPACITY = 0.0;
     CONFIG.SATURATION = 1.0;
   }

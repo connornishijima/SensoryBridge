@@ -1,7 +1,7 @@
 // AUDIO #######################################################
 
 #define SERIAL_BAUD 230400
-#define DEFAULT_SAMPLE_RATE 24400
+#define DEFAULT_SAMPLE_RATE 12800
 #define SAMPLE_HISTORY_LENGTH 4096
 
 // Don't change this unless you're willing to do a lot of other work on the code :/
@@ -10,6 +10,48 @@
 #define NUM_ZONES 2
 
 #define I2S_PORT I2S_NUM_0
+
+#define SPECTRAL_HISTORY_LENGTH 5
+
+#define MAX_DOTS 128
+
+enum reserved_dots {
+  GRAPH_NEEDLE,
+  GRAPH_DOT_1,
+  GRAPH_DOT_2,
+  GRAPH_DOT_3,
+  GRAPH_DOT_4,
+  GRAPH_DOT_5,
+  RIPPLE_LEFT,
+  RIPPLE_RIGHT,
+
+  RESERVED_DOTS
+};
+
+enum knob_names {
+  K_NONE,
+  K_PHOTONS,
+  K_CHROMA,
+  K_MOOD
+};
+
+struct CRGB16 {  // Unsigned Q8.8 Fixed-point color channels
+  SQ15x16 r;
+  SQ15x16 g;
+  SQ15x16 b;
+};
+
+struct DOT {
+  SQ15x16 position;
+  SQ15x16 last_position;
+};
+
+struct KNOB {
+  SQ15x16  value;
+  SQ15x16  last_value;
+  SQ15x16  change_rate;
+  uint32_t last_change;
+};
 
 const float notes[] = {
   55.00000, 58.27047, 61.73541, 65.40639, 69.29566, 73.41619, 77.78175, 82.40689, 87.30706, 92.49861, 97.99886, 103.8262,
@@ -25,49 +67,135 @@ const float notes[] = {
 // GPIO PINS #######################################################
 
 #define PHOTONS_PIN 1
-#define CHROMA_PIN  2
-#define MOOD_PIN    3
+#define CHROMA_PIN 2
+#define MOOD_PIN 3
 
-#define I2S_BCLK_PIN   33
-#define I2S_LRCLK_PIN  34
-#define I2S_DIN_PIN    35
+#define I2S_BCLK_PIN 33
+#define I2S_LRCLK_PIN 34
+#define I2S_DIN_PIN 35
 
-#define LED_DATA_PIN   36
-#define LED_CLOCK_PIN  37
+#define LED_DATA_PIN 36
+#define LED_CLOCK_PIN 37
 
-#define RNG_SEED_PIN   10
+#define RNG_SEED_PIN 10
 
-#define NOISE_CAL_PIN  11
-#define MODE_PIN       45
+#define NOISE_CAL_PIN 11
+#define MODE_PIN 45
 
-#define SWEET_SPOT_LEFT_PIN    7
-#define SWEET_SPOT_CENTER_PIN  8
-#define SWEET_SPOT_RIGHT_PIN   9
+#define SWEET_SPOT_LEFT_PIN 7
+#define SWEET_SPOT_CENTER_PIN 8
+#define SWEET_SPOT_RIGHT_PIN 9
 
 // OTHER #######################################################
 
-const float dither_table[8] = {
-  0.125,
-  0.250,
-  0.375,
-  0.500,
-  0.625,
-  0.750,
-  0.875,
-  1.000
+const SQ15x16 dither_table[4] = {
+  0.25,
+  0.50,
+  0.75,
+  1.00
+  /*
+  0.166666,
+  0.333333,
+  0.500000,
+  0.666666,
+  0.833333,
+  1.000000
+  */
 };
 
-#define SWEET_SPOT_LEFT_CHANNEL    0
-#define SWEET_SPOT_CENTER_CHANNEL  1
-#define SWEET_SPOT_RIGHT_CHANNEL   2
+SQ15x16 note_colors[12] = {
+  0.0000,
+  0.0833,
+  0.1666,
+  0.2499,
+  0.3333,
+  0.4166,
+  0.4999,
+  0.5833,
+  0.6666,
+  0.7499,
+  0.8333,
+  0.9166
+};
 
-#define TWOPI   6.28318530
+const SQ15x16 hue_lookup[64][3] = {
+  { 1.0000, 0.0000, 0.0000 },
+  { 0.9608, 0.0392, 0.0000 },
+  { 0.9176, 0.0824, 0.0000 },
+  { 0.8745, 0.1255, 0.0000 },
+  { 0.8314, 0.1686, 0.0000 },
+  { 0.7922, 0.2078, 0.0000 },
+  { 0.7490, 0.2510, 0.0000 },
+  { 0.7059, 0.2941, 0.0000 },
+  { 0.6706, 0.3333, 0.0000 },
+  { 0.6706, 0.3725, 0.0000 },
+  { 0.6706, 0.4157, 0.0000 },
+  { 0.6706, 0.4588, 0.0000 },
+  { 0.6706, 0.5020, 0.0000 },
+  { 0.6706, 0.5412, 0.0000 },
+  { 0.6706, 0.5843, 0.0000 },
+  { 0.6706, 0.6275, 0.0000 },
+  { 0.6706, 0.6667, 0.0000 },
+  { 0.5882, 0.7059, 0.0000 },
+  { 0.5059, 0.7490, 0.0000 },
+  { 0.4196, 0.7922, 0.0000 },
+  { 0.3373, 0.8353, 0.0000 },
+  { 0.2549, 0.8745, 0.0000 },
+  { 0.1686, 0.9176, 0.0000 },
+  { 0.0863, 0.9608, 0.0000 },
+  { 0.0000, 1.0000, 0.0000 },
+  { 0.0000, 0.9608, 0.0392 },
+  { 0.0000, 0.9176, 0.0824 },
+  { 0.0000, 0.8745, 0.1255 },
+  { 0.0000, 0.8314, 0.1686 },
+  { 0.0000, 0.7922, 0.2078 },
+  { 0.0000, 0.7490, 0.2510 },
+  { 0.0000, 0.7059, 0.2941 },
+  { 0.0000, 0.6706, 0.3333 },
+  { 0.0000, 0.5882, 0.4157 },
+  { 0.0000, 0.5059, 0.4980 },
+  { 0.0000, 0.4196, 0.5843 },
+  { 0.0000, 0.3373, 0.6667 },
+  { 0.0000, 0.2549, 0.7490 },
+  { 0.0000, 0.1686, 0.8353 },
+  { 0.0000, 0.0863, 0.9176 },
+  { 0.0000, 0.0000, 1.0000 },
+  { 0.0392, 0.0000, 0.9608 },
+  { 0.0824, 0.0000, 0.9176 },
+  { 0.1255, 0.0000, 0.8745 },
+  { 0.1686, 0.0000, 0.8314 },
+  { 0.2078, 0.0000, 0.7922 },
+  { 0.2510, 0.0000, 0.7490 },
+  { 0.2941, 0.0000, 0.7059 },
+  { 0.3333, 0.0000, 0.6706 },
+  { 0.3725, 0.0000, 0.6314 },
+  { 0.4157, 0.0000, 0.5882 },
+  { 0.4588, 0.0000, 0.5451 },
+  { 0.5020, 0.0000, 0.5020 },
+  { 0.5412, 0.0000, 0.4627 },
+  { 0.5843, 0.0000, 0.4196 },
+  { 0.6275, 0.0000, 0.3765 },
+  { 0.6667, 0.0000, 0.3333 },
+  { 0.7059, 0.0000, 0.2941 },
+  { 0.7490, 0.0000, 0.2510 },
+  { 0.7922, 0.0000, 0.2078 },
+  { 0.8353, 0.0000, 0.1647 },
+  { 0.8745, 0.0000, 0.1255 },
+  { 0.9176, 0.0000, 0.0824 },
+  { 0.9608, 0.0000, 0.0392 },
+};
+
+#define SWEET_SPOT_LEFT_CHANNEL 0
+#define SWEET_SPOT_CENTER_CHANNEL 1
+#define SWEET_SPOT_RIGHT_CHANNEL 2
+
+#define TWOPI 6.28318530
 #define FOURPI 12.56637061
-#define SIXPI  18.84955593
+#define SIXPI 18.84955593
 
 enum led_types {
   LED_NEOPIXEL,
   LED_DOTSTAR
 };
 
-CRGB incandescent_lookup = CRGB(255, 114, 40);
+CRGB16 incandescent_lookup = { 1.0000, 0.4453, 0.1562 };

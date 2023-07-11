@@ -2,17 +2,11 @@
   Sensory Bridge KNOB FUNCTIONS
 ----------------------------------------*/
 
-uint16_t avg_read(uint8_t pin){
+uint16_t avg_read(uint8_t pin) {
   uint32_t sum = 0;
   sum += analogRead(pin);
   sum += analogRead(pin);
-  sum += analogRead(pin);
-  sum += analogRead(pin);
-  sum += analogRead(pin);
-  sum += analogRead(pin);
-  sum += analogRead(pin);
-  sum += analogRead(pin);
-  return sum >> 3;
+  return sum >> 1;
 }
 
 void check_knobs(uint32_t t_now) {
@@ -24,7 +18,7 @@ void check_knobs(uint32_t t_now) {
   // not set to the MAIN unit, it will flash all units in the
   // network (p2p.h) to identify which unit's knobs to modify
   // instead to affect changes.
-  
+
   static uint32_t iter = 0;
   static float PHOTONS_TARGET = 1.0;
   static float CHROMA_TARGET = 1.0;
@@ -40,10 +34,10 @@ void check_knobs(uint32_t t_now) {
 
   iter++;
 
-  if (iter % 10 == 0) { // If frame count is multiple of 10
+  if (iter % 1 == 0) {  // If frame count is multiple of 2
     PHOTONS_TARGET = (1.0 - (avg_read(PHOTONS_PIN) / 8192.0));
-    CHROMA_TARGET  = (1.0 - (avg_read(CHROMA_PIN)  / 8192.0));
-    MOOD_TARGET    = (1.0 - (avg_read(MOOD_PIN)    / 8192.0));
+    CHROMA_TARGET = (1.0 - (avg_read(CHROMA_PIN) / 8192.0));
+    MOOD_TARGET = (1.0 - (avg_read(MOOD_PIN) / 8192.0));
   }
 
   // Happens every frame:
@@ -71,12 +65,11 @@ void check_knobs(uint32_t t_now) {
     MOOD_OUTPUT -= (delta * 0.1);
   }
 
-  if (CONFIG.IS_MAIN_UNIT || main_override) { // If we're MAIN unit, show changed values
+  if (CONFIG.IS_MAIN_UNIT || main_override) {  // If we're MAIN unit, show changed values
     CONFIG.PHOTONS = PHOTONS_OUTPUT;
     CONFIG.CHROMA = CHROMA_OUTPUT;
     CONFIG.MOOD = MOOD_OUTPUT;
-  }
-  else { // If NOT MAIN, ignored changed values, flash all units to identify MAIN unit
+  } else {  // If NOT MAIN, ignored changed values, flash all units to identify MAIN unit
     if (fabs(PHOTONS_TARGET - PHOTONS_TARGET_LAST) >= 0.05) {
       PHOTONS_TARGET_LAST = PHOTONS_TARGET;
       if (CONFIG.IS_MAIN_UNIT == false && main_override == false) {
@@ -99,11 +92,10 @@ void check_knobs(uint32_t t_now) {
 
   // CHROMA Knob handling
   chroma_val = 1.0;
-  if(CONFIG.CHROMA < 0.95){
-    chroma_val = CONFIG.CHROMA*1.05263157; // Reciprocal of 0.95 above
+  if (CONFIG.CHROMA < 0.95) {
+    chroma_val = CONFIG.CHROMA * 1.05263157;  // Reciprocal of 0.95 above
     chromatic_mode = false;
-  }
-  else{
+  } else {
     chromatic_mode = true;
   }
 
@@ -122,11 +114,49 @@ void check_knobs(uint32_t t_now) {
   }
   smoothing_bottom_half *= -1.0;
   smoothing_bottom_half = 1.0 - smoothing_bottom_half;
-  smoothing_bottom_half = (smoothing_bottom_half * 0.9) + 0.1; // 0.0-1.0 input range becomes 0.1-1.0
+  smoothing_bottom_half = (smoothing_bottom_half * 0.9) + 0.1;  // 0.0-1.0 input range becomes 0.1-1.0
   // Bottom half of knob now has range of 0.1 (fully left) to 1.0 (knob is centered) accesible through this variable (stays 1.0 when in top half)
   // Making 0.1 the bottom value prevents the LEDs from experiencing 0% change per frame! ;)
 
   // These are the final values we'll feed into the two smoothing algorithms soon
-  smoothing_follower    = 0.100 + (smoothing_top_half * 0.300); // 0.0-1.0 input range becomes 0.1 - 0.400
-  smoothing_exp_average = 1.0 - smoothing_bottom_half; // invert input
+  smoothing_follower = 0.100 + (smoothing_top_half * 0.300);  // 0.0-1.0 input range becomes 0.1 - 0.400
+  smoothing_exp_average = 1.0 - smoothing_bottom_half;        // invert input
+
+  // Process knob speed and update knob structs
+  knob_photons.value = CONFIG.PHOTONS;
+  knob_chroma.value = CONFIG.CHROMA;
+  knob_mood.value = CONFIG.MOOD;
+
+  SQ15x16 speed_threshold = 0.005;
+
+  knob_photons.change_rate = fabs_fixed(knob_photons.value - knob_photons.last_value);
+  knob_chroma.change_rate = fabs_fixed(knob_chroma.value - knob_chroma.last_value);
+  knob_mood.change_rate = fabs_fixed(knob_mood.value - knob_mood.last_value);
+
+  if (knob_photons.change_rate > speed_threshold) { knob_photons.last_change = t_now; }
+  if (knob_chroma.change_rate > speed_threshold) { knob_chroma.last_change = t_now; }
+  if (knob_mood.change_rate > speed_threshold) { knob_mood.last_change = t_now; }
+
+  uint16_t knob_timeout_ms = 1500;
+
+  uint32_t most_recent_time = 0;
+  uint8_t most_recent_knob = K_NONE;
+  if ((t_now - knob_photons.last_change) <= knob_timeout_ms && knob_photons.last_change > most_recent_time) {
+    most_recent_time = knob_photons.last_change;
+    most_recent_knob = K_PHOTONS;
+  }
+  if ((t_now - knob_chroma.last_change)  <= knob_timeout_ms && knob_chroma.last_change  > most_recent_time) {
+    most_recent_time = knob_chroma.last_change;
+    most_recent_knob = K_CHROMA;
+  }
+  if ((t_now - knob_mood.last_change)    <= knob_timeout_ms && knob_mood.last_change    > most_recent_time) {
+    most_recent_time = knob_mood.last_change;
+    most_recent_knob = K_MOOD;
+  }
+
+  current_knob = most_recent_knob;
+
+  knob_photons.last_value = knob_photons.value;
+  knob_chroma.last_value = knob_chroma.value;
+  knob_mood.last_value = knob_mood.value;
 }

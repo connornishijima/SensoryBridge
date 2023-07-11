@@ -13,12 +13,10 @@ struct conf {
   uint32_t SAMPLE_RATE;
   uint8_t  NOTE_OFFSET;
   uint8_t  SQUARE_ITER;
-  uint32_t MAGNITUDE_FLOOR;
   uint8_t  LED_TYPE;
   uint16_t LED_COUNT;
   uint16_t LED_COLOR_ORDER;
   bool     LED_INTERPOLATION;
-  uint16_t MAX_BLOCK_SIZE;
   uint16_t SAMPLES_PER_CHUNK;
   float    SENSITIVITY;
   bool     BOOT_ANIMATION;
@@ -31,14 +29,14 @@ struct conf {
   bool     IS_MAIN_UNIT;
   uint32_t MAX_CURRENT_MA;
   bool     TEMPORAL_DITHERING;
-  uint16_t MIN_BLOCK_SIZE;
   bool     AUTO_COLOR_SHIFT;
   float    INCANDESCENT_FILTER;
   bool     INCANDESCENT_MODE;
-  float    BACKDROP_BRIGHTNESS;
   float    BULB_OPACITY;
   float    SATURATION;
   uint8_t  PRISM_COUNT;
+  bool     BASE_COAT;
+  float    VU_LEVEL_FLOOR;
 };
 
 // ------------------------------------------------------------
@@ -50,38 +48,36 @@ conf CONFIG = {
   0.00, // CHROMA
   0.05, // MOOD
   LIGHT_MODE_GDFT, // LIGHTSHOW_MODE
-  false,           // MIRROR_ENABLED (>= 3.2.0 defaults no)
+  true,           // MIRROR_ENABLED
 
   // Private values
   DEFAULT_SAMPLE_RATE, // SAMPLE_RATE
   12,                  // NOTE_OFFSET
   1,                   // SQUARE_ITER
-  3000,                // MAGNITUDE_FLOOR
   LED_NEOPIXEL,        // LED_TYPE
   128,                 // LED_COUNT
   GRB,                 // LED_COLOR_ORDER
   true,                // LED_INTERPOLATION
-  3000,                // MAX_BLOCK_SIZE
-  128,                 // SAMPLES_PER_CHUNK
+  96,                  // SAMPLES_PER_CHUNK
   1.0,                 // SENSITIVITY
   true,                // BOOT_ANIMATION
   750,                 // SWEET_SPOT_MIN_LEVEL
   30000,               // SWEET_SPOT_MAX_LEVEL
   0,                   // DC_OFFSET
   60,                  // CHROMAGRAM_RANGE
-  false,               // STANDBY_DIMMING
+  true,                // STANDBY_DIMMING
   false,               // REVERSE_ORDER
   false,               // IS_MAIN_UNIT
   1500,                // MAX_CURRENT_MA
   true,                // TEMPORAL_DITHERING
-  5,                   // MIN_BLOCK_SIZE
   false,               // AUTO_COLOR_SHIFT
-  0.80,                // INCANDESCENT_FILTER
+  0.50,                // INCANDESCENT_FILTER
   false,               // INCANDESCENT_MODE
-  0.00,                // BACKDROP_BRIGHTNESS
   0.00,                // BULB_OPACITY
   1.00,                // SATURATION
   0,                   // PRISM_COUNT
+  true,                // BASE_COAT
+  0.00,                // VU_LEVEL_FLOOR
 };
 
 conf CONFIG_DEFAULTS; // Used for resetting to default values at runtime
@@ -107,7 +103,7 @@ freq frequencies[NUM_FREQS];
 // ------------------------------------------------------------
 // Hann window lookup table (generated in system.h) -----------
 
-float window_lookup[4096] = { 0 };
+int16_t window_lookup[4096] = { 0 };
 
 // ------------------------------------------------------------
 // A-weighting lookup table (parsed in system.h) --------------
@@ -131,6 +127,15 @@ float a_weight_table[13][2] = {
 // ------------------------------------------------------------
 // Spectrograms (GDFT.h) --------------------------------------
 
+SQ15x16 spectrogram[NUM_FREQS] = { 0.0 };
+SQ15x16 spectrogram_smooth[NUM_FREQS] = { 0.0 };
+SQ15x16 chromagram_smooth[12] = { 0.0 };
+
+SQ15x16 spectral_history[SPECTRAL_HISTORY_LENGTH][NUM_FREQS];
+SQ15x16 novelty_curve[SPECTRAL_HISTORY_LENGTH] = { 0.0 };
+
+uint8_t spectral_history_index = 0;
+
 float note_spectrogram[NUM_FREQS] = {0};
 float note_spectrogram_smooth[NUM_FREQS] = {0};
 float note_spectrogram_smooth_frame_blending[NUM_FREQS] = {0};
@@ -142,7 +147,7 @@ float chromagram_bass_max_val = 0.0;
 float smoothing_follower    = 0.0;
 float smoothing_exp_average = 0.0;
 
-float chroma_val = 1.0;
+SQ15x16 chroma_val = 1.0;
 bool chromatic_mode = true;
 
 // ------------------------------------------------------------
@@ -151,6 +156,7 @@ bool chromatic_mode = true;
 int32_t i2s_samples_raw[1024]                = { 0 };
 short   sample_window[SAMPLE_HISTORY_LENGTH] = { 0 };
 short   waveform[1024]                       = { 0 };
+SQ15x16 waveform_fixed_point[1024]           = { 0 };
 short   waveform_history[4][1024]            = { 0 };
 uint8_t waveform_history_index = 0;
 float   max_waveform_val_raw = 0.0;
@@ -173,12 +179,13 @@ float sweet_spot_min_temp = 0;
 // Noise calibration (noise_cal.h) ----------------------------
 
 bool     noise_complete = true;
-float    noise_samples[NUM_FREQS] = { 1 };
+SQ15x16  noise_samples[NUM_FREQS] = { 1 };
 uint16_t noise_iterations = 0;
 
 // ------------------------------------------------------------
 // Display buffers (led_utilities.h) --------------------------
 
+/*
 CRGB leds[128];
 CRGB leds_frame_blending[128];
 CRGB leds_fx[128];
@@ -186,10 +193,22 @@ CRGB leds_temp[128];
 CRGB leds_last[128];
 CRGB leds_aux [128];
 CRGB leds_fade[128];
+*/
 
+CRGB16  leds_16[128];
+CRGB16  leds_16_prev[128];
+CRGB16  leds_16_fx[128];
+CRGB16  leds_16_fx_2[128];
+CRGB16  leds_16_temp[128];
+CRGB16  leds_16_ui[128];
+
+SQ15x16 ui_mask[128];
+SQ15x16 ui_mask_height = 0.0;
+
+CRGB16 *leds_scaled;
 CRGB *leds_out;
 
-float hue_shift = 0.0; // Used in auto color cycling
+SQ15x16 hue_shift = 0.0; // Used in auto color cycling
 
 uint8_t dither_step = 0;
 bool led_thread_halt = false;
@@ -232,7 +251,7 @@ bool    noise_transition_queued = false;
 // ------------------------------------------------------------
 // Settings tracking (system.h) -------------------------------
 
-uint32_t last_setting_change = 0;
+uint32_t next_save_time = 0;
 bool     settings_updated = false;
 
 // ------------------------------------------------------------
@@ -264,7 +283,11 @@ float max_mags_followers[NUM_ZONES] = { 0.000 };
 float mag_targets[NUM_FREQS] = { 0.000 };
 float mag_followers[NUM_FREQS] = { 0.000 };
 float mag_float_last[NUM_FREQS] = { 0.000 };
-float magnitudes[NUM_FREQS] = { 0.000 };
+int32_t magnitudes[NUM_FREQS] = { 0 };
+float magnitudes_normalized[NUM_FREQS] = { 0.000 };
+float magnitudes_normalized_avg[NUM_FREQS] = { 0.000 };
+float magnitudes_last[NUM_FREQS] = { 0.000 };
+float magnitudes_final[NUM_FREQS] = { 0.000 };
 
 // ------------------------------------------------------------
 // Look-ahead smoothing (GDFT.h) ------------------------------
@@ -294,6 +317,35 @@ uint8_t brightness_levels[NUM_FREQS] = { 0 };
 FirmwareMSC MSC_Update;
 USBCDC USBSerial;
 bool msc_update_started = false;
+
+// DOTS
+DOT dots[MAX_DOTS];
+
+// Auto Color Shift
+SQ15x16 hue_position = 0.0;
+SQ15x16 hue_shift_speed = 0.0;
+SQ15x16 hue_push_direction = -1.0;
+SQ15x16 hue_destination = 0.0;
+SQ15x16 hue_shifting_mix = -0.35;
+SQ15x16 hue_shifting_mix_target = 1.0;
+
+// VU Calculation
+SQ15x16 audio_vu_level = 0.0;
+SQ15x16 audio_vu_level_average = 0.0;
+SQ15x16 audio_vu_level_last = 0.0;
+
+// Knobs
+KNOB knob_photons;
+KNOB knob_chroma;
+KNOB knob_mood;
+uint8_t current_knob = K_NONE;
+
+// Base Coat
+SQ15x16 base_coat_width        = 0.0;
+SQ15x16 base_coat_width_target = 1.0;
+
+// Config File
+char config_filename[24];
 
 // WIP BELOW --------------------------------------------------
 

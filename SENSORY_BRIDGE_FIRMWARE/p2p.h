@@ -81,7 +81,8 @@ void identify_main_unit() {
     esp_now_send(peer_addr, (uint8_t *)&identify, sizeof(SB_COMMAND_IDENTIFY_MAIN));
   }
 
-  blocking_flash(CRGB(255, 0, 0)); // We aren't main unit, flash red
+  CRGB16 col = {1.0, 0.0, 0.0};
+  blocking_flash(col); // We aren't main unit, flash red
 }
 
 void propagate_noise_cal() {
@@ -196,6 +197,7 @@ void run_p2p() {
 
   if (flashing_flag) {
     flashing_flag = false;
-    blocking_flash(CRGB(0, 255, 0));
+    CRGB16 col = {0.0, 1.0, 0.0};
+    blocking_flash(col);
   }
 }

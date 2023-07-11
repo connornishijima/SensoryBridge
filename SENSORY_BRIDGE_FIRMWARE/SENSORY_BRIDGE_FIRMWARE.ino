@@ -50,7 +50,7 @@
 
   ---------------------------------------------------------------------*/
 
-#define FIRMWARE_VERSION 30200  // Try "V" on the Serial port for this!
+#define FIRMWARE_VERSION 40000  // Try "V" on the Serial port for this!
 //                       MmmPP     M = Major version, m = Minor version, P = Patch version
 //                                 (i.e 3.5.4 would be 30504)
 
@@ -58,12 +58,11 @@
 enum lightshow_modes {
   LIGHT_MODE_GDFT,  // ------------- GDFT - Goertzel-based Discrete Fourier Transform
   //                                 (I made this name up. Saved you a search.)
-  LIGHT_MODE_GDFT_CHROMAGRAM,  // -- Chromagram of GDFT
-  LIGHT_MODE_BLOOM,            // -- Slow Bloom Mode
-  LIGHT_MODE_BLOOM_FAST,       // -- Fast Bloom Mode
-  LIGHT_MODE_VU,               // -- Not a real VU for any measurement sake, just a dance-y LED bar
-  LIGHT_MODE_VU_DOT,           // -- Alternate VU display mode - dot with motion blur
-  LIGHT_MODE_KALEIDOSCOPE,     // -- Three color channels 2D Perlin noise affected by the onsets of low, mid and high pitches
+  LIGHT_MODE_GDFT_CHROMAGRAM,       // -- Chromagram of GDFT
+  LIGHT_MODE_GDFT_CHROMAGRAM_DOTS,  // -- Chromagram of GDFT
+  LIGHT_MODE_BLOOM,                 // -- Bloom Mode
+  LIGHT_MODE_VU_DOT,                // -- Not a real VU for any measurement sake, just a dance-y LED show
+  LIGHT_MODE_KALEIDOSCOPE,          // -- Three color channels 2D Perlin noise affected by the onsets of low, mid and high pitches
 
   NUM_MODES  // used to know the length of this list if it changes in the future
 };
@@ -71,12 +70,15 @@ enum lightshow_modes {
 // External dependencies -------------------------------------------------------------
 #include <WiFi.h>         // Needed for Station Mode
 #include <esp_now.h>      // P2P wireless communication library (p2p.h below)
+#include <esp_random.h>   // RNG Functions
 #include <FastLED.h>      // Handles LED color data and display
 #include <FS.h>           // Filesystem functions (bridge_fs.h below)
 #include <LittleFS.h>     // LittleFS implementation
 #include <Ticker.h>       // Scheduled tasks library
 #include <USB.h>          // USB Connection handling
 #include <FirmwareMSC.h>  // Allows firmware updates via USB MSC
+#include <FixedPoints.h>
+#include <FixedPointsCommon.h>
 
 // Include Sensory Bridge firmware files, sorted high to low, by boringness ;) -------
 #include "strings.h"          // Strings for printing
@@ -85,11 +87,11 @@ enum lightshow_modes {
 #include "globals.h"          // Global variables
 #include "presets.h"          // Configuration presets by name
 #include "bridge_fs.h"        // Filesystem access (save/load configuration)
+#include "utilities.h"        // Misc. math and other functions
 #include "i2s_audio.h"        // I2S Microphone audio capture
 #include "led_utilities.h"    // LED color/transform utility functions
 #include "noise_cal.h"        // Background noise removal
 #include "p2p.h"              // Sensory Sync handling
-#include "utilities.h"        // Misc. math and other functions
 #include "buttons.h"          // Watch the status of buttons
 #include "knobs.h"            // Watch the status of knobs...
 #include "serial_menu.h"      // Watch the Serial port... *sigh*
@@ -138,13 +140,27 @@ void loop() {
   run_sweet_spot();  // (led_utilities.h)
   // Based on the current audio volume, alter the Sweet Spot indicator LEDs
 
+  // Calculates audio loudness (VU) using RMS, adjusting for noise floor based on calibration
+  calculate_vu();
+
   function_id = 7;
   process_GDFT();  // (GDFT.h)
   // Execute GDFT and post-process
   // (If you're wondering about that weird acronym, check out the source file)
 
+  // Watches the rate of change in the Goertzel bins to guide decisions for auto-color shifting
+  calculate_novelty(t_now);
+
+  if (CONFIG.AUTO_COLOR_SHIFT == true) {  // Automatically cycle color based on density of positive spectral changes
+    // Use the "novelty" findings of the above function to affect color shifting when auto-color shifts are enabled
+    process_color_shift();
+  } else {
+    hue_position = 0;
+    hue_shifting_mix = -0.35;
+  }
+
   function_id = 8;
-  lookahead_smoothing();  // (GDFT.h)
+  //lookahead_smoothing();  // (GDFT.h)
   // Peek at upcoming frames to study/prevent flickering
 
   function_id = 8;
@@ -162,77 +178,62 @@ void loop() {
 // Run the lights in their own thread! -------------------------------------------------------------
 void led_thread(void* arg) {
   while (true) {
-    if (led_thread_halt == false) {
-      if (noise_complete == true) {                                               // If we're not gathering ambient noise data
-        if (mode_transition_queued == true || noise_transition_queued == true) {  // If transition queued
-          run_transition_fade();                                                  // (led_utilities.h) Fade to black between modes
+    if (led_thread_halt == false) {                                             // If we're not gathering ambient noise data
+      if (mode_transition_queued == true || noise_transition_queued == true) {  // If transition queued
+        run_transition_fade();                                                  // (led_utilities.h) Fade to black between modes
+      }
+
+      get_smooth_spectrogram();
+      make_smooth_chromagram();
+
+      // Based on the value of CONFIG.LIGHTSHOW_MODE, we call a
+      // different rendering function from lightshow_modes.h:
+
+      if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT) {
+        light_mode_gdft();  // (lightshow_modes.h) GDFT spectrogram display
+      } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {
+        light_mode_chromagram_gradient();  //light_mode_chromagram_gradient();  // (lightshow_modes.h) GDFT chromagram display
+      } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM_DOTS) {
+        light_mode_chromagram_dots();  //light_mode_chromagram_dots();  // (lightshow_modes.h) GDFT chromagram display
+      } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
+        light_mode_bloom();  // (lightshow_modes.h) Bloom Mode display
+      } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
+        light_mode_vu_dot();  // (lightshow_modes.h) VU Mode display (dot version)
+      } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_KALEIDOSCOPE) {
+        light_mode_kaleidoscope();  // (lightshow_modes.h) Kaleidoscope Mode display
+      }
+
+      if (CONFIG.PRISM_COUNT > 0) {
+        apply_prism_effect(CONFIG.PRISM_COUNT, 0.25);
+      }
+
+      // Render bulb filter
+      if (CONFIG.BULB_OPACITY > 0.00) {
+        render_bulb_cover();
+      }
+
+      // If forcing monochromatic incandescent output
+      if (CONFIG.INCANDESCENT_MODE == true) {
+        for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
+          leds_16[i] = adjust_hue_and_saturation(leds_16[i], 0.05, 0.95);
         }
+      }
 
-        if (CONFIG.AUTO_COLOR_SHIFT == true) {  // Automatically cycle color based on density of positive spectral changes
-          hue_shift -= current_punch;
-        } else {
-          hue_shift = 0;  // Reset hue shift if non-zero
-        }
-
-        // Based on the value of CONFIG.LIGHTSHOW_MODE, we call a
-        // different rendering function from lightshow_modes.h:
-
-        if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT) {
-          light_mode_gdft();  // (lightshow_modes.h) GDFT spectrogram display
-        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_GDFT_CHROMAGRAM) {
-          light_mode_gdft_chromagram();  // (lightshow_modes.h) GDFT chromagram display
-        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM) {
-          light_mode_bloom(false);  // (lightshow_modes.h) Bloom Mode display
-        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_BLOOM_FAST) {
-          light_mode_bloom(true);  // (lightshow_modes.h) Bloom Mode display (faster)
-        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU) {
-          light_mode_vu();  // (lightshow_modes.h) VU Mode display
-        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_VU_DOT) {
-          light_mode_vu_dot();  // (lightshow_modes.h) VU Mode display (dot version)
-        } else if (CONFIG.LIGHTSHOW_MODE == LIGHT_MODE_KALEIDOSCOPE) {
-          light_mode_kaleidoscope();  // (lightshow_modes.h) Kaleidoscope Mode display
-        }
-
-        if(CONFIG.PRISM_COUNT > 0){
-          apply_prism_effect(CONFIG.PRISM_COUNT, 64);
-        }
-
-        if (CONFIG.MIRROR_ENABLED) {  // Mirroring logic
-          // Don't scale Bloom Mode before mirroring
-          if (CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM && CONFIG.LIGHTSHOW_MODE != LIGHT_MODE_BLOOM_FAST) {
-            scale_image_to_half(leds);  // (led_utilities.h) Image is now 50% height
-          }
-          shift_leds_up(leds, 64);         // (led_utilities.h) Move image up one half
-          mirror_image_downwards(leds);  // (led_utilities.h) Mirror downwards
-        }
-
-        // Render bulb filter
-        if (CONFIG.BULB_OPACITY > 0.00) {
-          render_bulb_cover();
-        }
-
-        // If forcing monochromatic incandescent output
-        if (CONFIG.INCANDESCENT_MODE == true) {
-          force_incandescent_output();
-        }
-
-        // If not forcing incandescent mode, tint the color image with an incandescent LUT to reduce harsh blues
-        else if (CONFIG.INCANDESCENT_FILTER > 0.0) {
-          apply_incandescent_filter();
-        }
-
-      } else {
-        noise_cal_led_readout();  // (noise_cal.h) Show the noise profile and progress during calibration
+      if (CONFIG.MIRROR_ENABLED == false) {  // Mirroring logic
+        unmirror();
       }
 
       show_leds();  // This sends final RGB data to the LEDS (led_utilities.h)
       LED_FPS = FastLED.getFPS();
     }
+    else{
+      vTaskDelay(0);
+    }
 
     if (CONFIG.LED_TYPE == LED_NEOPIXEL) {
       //vTaskDelay(1); // delay for 1ms to avoid hogging the CPU
     } else if (CONFIG.LED_TYPE == LED_DOTSTAR) {  // More delay to compensate for faster LEDs
-      vTaskDelay(3);                              // delay for 3ms to avoid hogging the CPU
+      //vTaskDelay(3);                              // delay for 3ms to avoid hogging the CPU
     }
   }
 }

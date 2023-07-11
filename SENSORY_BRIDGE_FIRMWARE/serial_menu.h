@@ -137,9 +137,6 @@ void dump_info() {
   USBSerial.print("CONFIG.SQUARE_ITER: ");
   USBSerial.println(CONFIG.SQUARE_ITER);
 
-  USBSerial.print("CONFIG.MAGNITUDE_FLOOR: ");
-  USBSerial.println(CONFIG.MAGNITUDE_FLOOR);
-
   USBSerial.print("CONFIG.LED_TYPE: ");
   USBSerial.println(CONFIG.LED_TYPE);
 
@@ -148,9 +145,6 @@ void dump_info() {
 
   USBSerial.print("CONFIG.LED_COLOR_ORDER: ");
   USBSerial.println(CONFIG.LED_COLOR_ORDER);
-
-  USBSerial.print("CONFIG.MAX_BLOCK_SIZE: ");
-  USBSerial.println(CONFIG.MAX_BLOCK_SIZE);
 
   USBSerial.print("CONFIG.SAMPLES_PER_CHUNK: ");
   USBSerial.println(CONFIG.SAMPLES_PER_CHUNK);
@@ -185,9 +179,6 @@ void dump_info() {
   USBSerial.print("CONFIG.TEMPORAL_DITHERING: ");
   USBSerial.println(CONFIG.TEMPORAL_DITHERING);
 
-  USBSerial.print("CONFIG.MIN_BLOCK_SIZE: ");
-  USBSerial.println(CONFIG.MIN_BLOCK_SIZE);
-
   USBSerial.print("CONFIG.AUTO_COLOR_SHIFT: ");
   USBSerial.println(CONFIG.AUTO_COLOR_SHIFT);
 
@@ -197,9 +188,6 @@ void dump_info() {
   USBSerial.print("CONFIG.INCANDESCENT_MODE: ");
   USBSerial.println(CONFIG.INCANDESCENT_MODE);
 
-  USBSerial.print("CONFIG.BACKDROP_BRIGHTNESS: ");
-  USBSerial.println(CONFIG.BACKDROP_BRIGHTNESS);
-
   USBSerial.print("CONFIG.BULB_OPACITY: ");
   USBSerial.println(CONFIG.BULB_OPACITY);
 
@@ -208,6 +196,9 @@ void dump_info() {
 
   USBSerial.print("CONFIG.PRISM_COUNT: ");
   USBSerial.println(CONFIG.PRISM_COUNT);
+
+  USBSerial.print("CONFIG.BASE_COAT: ");
+  USBSerial.println(CONFIG.BASE_COAT);
 
   USBSerial.print("MASTER_BRIGHTNESS: ");
   USBSerial.println(MASTER_BRIGHTNESS);
@@ -248,8 +239,8 @@ void dump_info() {
   USBSerial.print("last_rx_time: ");
   USBSerial.println(last_rx_time);
 
-  USBSerial.print("last_setting_change: ");
-  USBSerial.println(last_setting_change);
+  USBSerial.print("next_save_time: ");
+  USBSerial.println(next_save_time);
 
   USBSerial.print("settings_updated: ");
   USBSerial.println(settings_updated);
@@ -314,7 +305,7 @@ void parse_command(char* command_buf) {
     USBSerial.println("          reverse_order=[true/false/default] | Toggle whether image is flipped upside down before final rendering");
     USBSerial.println("                         get_mode_name=[int] | Get a mode's name by ID (index)");
     USBSerial.println("                               stream=[type] | Stream live data to a Serial Plotter.");
-    USBSerial.println("                                               Options are: audio, fps, max_mags, max_mags_followers, magnitudes, spectrogram, chromagram");
+    USBSerial.println("                                               Options are: audio, fps, magnitudes, spectrogram, chromagram");
     USBSerial.println("             led_type=['neopixel'/'dotstar'] | Sets which LED protocol to use, 3 wire or 4 wire");
     USBSerial.println("                led_count=[int or 'default'] | Sets how many LEDs your display will use (native resolution is 128)");
     USBSerial.println("       led_color_order=[GRB/RGB/BGR/default] | Sets LED color ordering, default GRB");
@@ -323,9 +314,6 @@ void parse_command(char* command_buf) {
     USBSerial.println("               sample_rate=[hz or 'default'] | Sets the microphone sample rate");
     USBSerial.println("             note_offset=[0-32 or 'default'] | Sets the lowest note, as a positive offset from A1 (55.0Hz)");
     USBSerial.println("              square_iter=[int or 'default'] | Sets the number of times the LED output is squared (contrast)");
-    USBSerial.println("          magnitude_floor=[int or 'default'] | Sets minimum magnitude a frequency bin must have to contribute the show");
-    USBSerial.println("           min_block_size=[int or 'default'] | Sets the minimum number of samples used to compute frequency data");
-    USBSerial.println("           max_block_size=[int or 'default'] | Sets the maximum number of samples used to compute frequency data");
     USBSerial.println("        samples_per_chunk=[int or 'default'] | Sets the number of samples collected every frame");
     USBSerial.println("            sensitivity=[float or 'default'] | Sets the scaling of audio data (>1.0 is more sensitive, <1.0 is less sensitive)");
     USBSerial.println("         boot_animation=[true/false/default] | Enable or disable the boot animation");
@@ -341,7 +329,7 @@ void parse_command(char* command_buf) {
     USBSerial.println("       auto_color_shift=[true/false/default] | Toggle automated color shifting based on positive spectral changes");
     USBSerial.println("    incandescent_filter=[float or 'default'] | Set the intensity of the incandescent LUT (reduces harsh blues)");
     USBSerial.println("      incandescent_mode=[true/false/default] | Force all output into monochrome and tint with 2700K incandescent color");
-    USBSerial.println("    backdrop_brightness=[float or 'default'] | Set the intensity of the backdrop color (approves appearance in certain modes)");
+    USBSerial.println("              base_coat=[true/false/default] | Enable a dim gray backdrop to the LEDs (approves appearance in most modes)");
     USBSerial.println("           bulb_opacity=[float or 'default'] | Set opacity of a filter that portrays the output as 32 \"bulbs\" with separation and hot spots");
     USBSerial.println("             saturation=[float or 'default'] | Sets the saturation of internal hues");
     USBSerial.println("              prism_count=[int or 'default'] | Sets the number of times the \"prism\" effect is applied");
@@ -393,7 +381,8 @@ void parse_command(char* command_buf) {
   else if (strcmp(command_buf, "identify") == 0) {
 
     ack();
-    blocking_flash(CRGB(255, 64, 0));
+    CRGB16 col = {1.00, 0.25, 0.00};
+    blocking_flash(col);
 
   }
 
@@ -661,7 +650,7 @@ void parse_command(char* command_buf) {
         CONFIG.SAMPLE_RATE = CONFIG_DEFAULTS.SAMPLE_RATE;
       } else {
         good = true;
-        CONFIG.SAMPLE_RATE = constrain(atol(command_data), 8000, 44100);
+        CONFIG.SAMPLE_RATE = constrain(atol(command_data), 6400, 44100);
       }
 
       if (good) {
@@ -740,21 +729,6 @@ void parse_command(char* command_buf) {
       tx_end();
     }
 
-    // Set Magnitude Floor -----------------------------------
-    else if (strcmp(command_type, "magnitude_floor") == 0) {
-      if (strcmp(command_data, "default") == 0) {
-        CONFIG.MAGNITUDE_FLOOR = CONFIG_DEFAULTS.MAGNITUDE_FLOOR;
-      } else {
-        CONFIG.MAGNITUDE_FLOOR = constrain(atol(command_data), 0, uint32_t(-1));
-      }
-      save_config_delayed();
-
-      tx_begin();
-      USBSerial.print("CONFIG.MAGNITUDE_FLOOR: ");
-      USBSerial.println(CONFIG.MAGNITUDE_FLOOR);
-      tx_end();
-    }
-
     // Set LED Type ---------------------------------------
     else if (strcmp(command_type, "led_type") == 0) {
       bool good = false;
@@ -821,6 +795,31 @@ void parse_command(char* command_buf) {
       }
     }
 
+    // Set Base Coat ----------------------------
+    else if (strcmp(command_type, "base_coat") == 0) {
+      bool good = false;
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.BASE_COAT = CONFIG_DEFAULTS.BASE_COAT;
+        good = true;
+      } else if (strcmp(command_data, "true") == 0) {
+        CONFIG.BASE_COAT = true;
+        good = true;
+      } else if (strcmp(command_data, "false") == 0) {
+        CONFIG.BASE_COAT = false;
+        good = true;
+      } else {
+        bad_command(command_type, command_data);
+      }
+
+      if (good) {
+        save_config_delayed();
+        tx_begin();
+        USBSerial.print("CONFIG.BASE_COAT: ");
+        USBSerial.println(CONFIG.BASE_COAT);
+        tx_end();
+      }
+    }
+
     // Set LED Temporal Dithering ----------------------------
     else if (strcmp(command_type, "temporal_dithering") == 0) {
       bool good = false;
@@ -873,38 +872,6 @@ void parse_command(char* command_buf) {
         tx_end();
         reboot();
       }
-    }
-
-    // Set Max Block Size ------------------------------
-    else if (strcmp(command_type, "max_block_size") == 0) {
-      if (strcmp(command_data, "default") == 0) {
-        CONFIG.MAX_BLOCK_SIZE = CONFIG_DEFAULTS.MAX_BLOCK_SIZE;
-      } else {
-        CONFIG.MAX_BLOCK_SIZE = constrain(atol(command_data), 1, SAMPLE_HISTORY_LENGTH);
-      }
-
-      save_config();
-      tx_begin();
-      USBSerial.print("CONFIG.MAX_BLOCK_SIZE: ");
-      USBSerial.println(CONFIG.MAX_BLOCK_SIZE);
-      tx_end();
-      reboot();
-    }
-
-    // Set Min Block Size ------------------------------
-    else if (strcmp(command_type, "min_block_size") == 0) {
-      if (strcmp(command_data, "default") == 0) {
-        CONFIG.MIN_BLOCK_SIZE = CONFIG_DEFAULTS.MIN_BLOCK_SIZE;
-      } else {
-        CONFIG.MIN_BLOCK_SIZE = constrain(atol(command_data), 1, SAMPLE_HISTORY_LENGTH);
-      }
-
-      save_config();
-      tx_begin();
-      USBSerial.print("CONFIG.MIN_BLOCK_SIZE: ");
-      USBSerial.println(CONFIG.MIN_BLOCK_SIZE);
-      tx_end();
-      reboot();
     }
 
     // Set Samples Per Chunk ---------------------------
@@ -1222,26 +1189,6 @@ void parse_command(char* command_buf) {
         USBSerial.println(CONFIG.INCANDESCENT_MODE);
         tx_end();
       }
-    }
-
-    // Set Backdrop Brightness ----------------------------
-    else if (strcmp(command_type, "backdrop_brightness") == 0) {
-      if (strcmp(command_data, "default") == 0) {
-        CONFIG.BACKDROP_BRIGHTNESS = CONFIG_DEFAULTS.BACKDROP_BRIGHTNESS;
-      } else {
-        CONFIG.BACKDROP_BRIGHTNESS = atof(command_data);
-        if (CONFIG.BACKDROP_BRIGHTNESS < 0.0) {
-          CONFIG.BACKDROP_BRIGHTNESS = 0.0;
-        } else if (CONFIG.BACKDROP_BRIGHTNESS > 1.0) {
-          CONFIG.BACKDROP_BRIGHTNESS = 1.0;
-        }
-      }
-
-      save_config_delayed();
-      tx_begin();
-      USBSerial.print("CONFIG.BACKDROP_BRIGHTNESS: ");
-      USBSerial.println(CONFIG.BACKDROP_BRIGHTNESS);
-      tx_end();
     }
 
     // Set Bulb Cover Opacity ----------------------------
