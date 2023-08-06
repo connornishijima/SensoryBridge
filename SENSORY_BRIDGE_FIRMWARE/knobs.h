@@ -2,24 +2,14 @@
   Sensory Bridge KNOB FUNCTIONS
 ----------------------------------------*/
 
-uint16_t avg_read(uint8_t pin) {
-  uint32_t sum = 0;
-  sum += analogRead(pin);
-  sum += analogRead(pin);
-  return sum >> 1;
-}
+void update_photons_chroma_mood(uint32_t t_now, float photons_value, float chroma_value, float mood_value) {
+  // update the PHOTONS, CHROMA, and MOOD using either knob data or serial data from the user
 
-void check_knobs(uint32_t t_now) {
-  // On every 10th frame, the knobs are read. The resulting
-  // values are put through the same "follower" smoothing
-  // algorithm detailed in GDFT.h.
-  //
-  // If a knob value changes more than 5% and this unit is
+  // If a value changes more than 5% and this unit is
   // not set to the MAIN unit, it will flash all units in the
   // network (p2p.h) to identify which unit's knobs to modify
   // instead to affect changes.
 
-  static uint32_t iter = 0;
   static float PHOTONS_TARGET = 1.0;
   static float CHROMA_TARGET = 1.0;
   static float MOOD_TARGET = 1.0;
@@ -32,13 +22,12 @@ void check_knobs(uint32_t t_now) {
   static float CHROMA_TARGET_LAST = 1.0;
   static float MOOD_TARGET_LAST = 1.0;
 
-  iter++;
-
-  if (iter % 1 == 0) {  // If frame count is multiple of 2
-    PHOTONS_TARGET = (1.0 - (avg_read(PHOTONS_PIN) / 8192.0));
-    CHROMA_TARGET = (1.0 - (avg_read(CHROMA_PIN) / 8192.0));
-    MOOD_TARGET = (1.0 - (avg_read(MOOD_PIN) / 8192.0));
-  }
+  if (!(photons_value < 0.0)) // a negative value means there is no new value for property
+    PHOTONS_OUTPUT = photons_value;
+  if (!(chroma_value < 0.0)) // a negative value means there is no new value for property
+    CHROMA_OUTPUT = chroma_value;
+  if (!(mood_value < 0.0)) // a negative value means there is no new value for property
+    MOOD_OUTPUT = mood_value;
 
   // Happens every frame:
   if (PHOTONS_TARGET > PHOTONS_OUTPUT) {
@@ -159,4 +148,36 @@ void check_knobs(uint32_t t_now) {
   knob_photons.last_value = knob_photons.value;
   knob_chroma.last_value = knob_chroma.value;
   knob_mood.last_value = knob_mood.value;
+}
+
+
+uint16_t avg_read(uint8_t pin) {
+  uint32_t sum = 0;
+  sum += analogRead(pin);
+  sum += analogRead(pin);
+  return sum >> 1;
+}
+
+void check_knobs(uint32_t t_now) {
+  // On every other frame, the knobs are read. The resulting
+  // values are put through the same "follower" smoothing
+  // algorithm detailed in GDFT.h.
+  static uint32_t iter = 0;
+
+  iter++;
+  float photons_value = -1.0, chroma_value = -1.0, mood_value = -1.0;
+
+  if (iter % 1 == 0) {  // If frame count is multiple of 2
+#ifdef PHOTONS_PIN
+    photons_value = (1.0 - (avg_read(PHOTONS_PIN) / 8192.0));
+#endif
+#ifdef CHROMA_PIN
+    chroma_value = (1.0 - (avg_read(CHROMA_PIN) / 8192.0));
+#endif
+#ifdef MOOD_PIN
+    mood_value = (1.0 - (avg_read(MOOD_PIN) / 8192.0));
+#endif
+  }
+
+  update_photons_chroma_mood(t_now, photons_value, chroma_value, mood_value);
 }

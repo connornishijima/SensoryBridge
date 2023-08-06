@@ -77,6 +77,13 @@ void check_buttons(uint32_t t_now) {
         mode_transition_queued = false;
         MASTER_BRIGHTNESS = 1.0;
         if(debug_mode){USBSerial.println("DOUBLE CLICK");}
+#ifdef LUMOSSTICK
+        // the LUMOSSTICK will use the double-click to toggle column first vs row first rendering
+        if (CONFIG.IS_MAIN_UNIT || main_override) {
+          CONFIG.LUMOS_ORDER = !CONFIG.LUMOS_ORDER;
+          save_config_delayed();
+        }
+#endif
       }
 
       uint32_t press_duration = mode_button.last_up - mode_button.last_down;

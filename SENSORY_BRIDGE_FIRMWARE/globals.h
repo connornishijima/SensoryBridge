@@ -37,6 +37,7 @@ struct conf {
   uint8_t  PRISM_COUNT;
   bool     BASE_COAT;
   float    VU_LEVEL_FLOOR;
+  uint8_t  LUMOS_ORDER;   // used by LumosStick to switch between rendering rows first or columns first
 };
 
 // ------------------------------------------------------------
@@ -55,7 +56,7 @@ conf CONFIG = {
   12,                  // NOTE_OFFSET
   1,                   // SQUARE_ITER
   LED_NEOPIXEL,        // LED_TYPE
-  128,                 // LED_COUNT
+  TOTAL_LED_COUNT,     // LED_COUNT
   GRB,                 // LED_COLOR_ORDER
   true,                // LED_INTERPOLATION
   96,                  // SAMPLES_PER_CHUNK
@@ -76,8 +77,9 @@ conf CONFIG = {
   0.00,                // BULB_OPACITY
   1.00,                // SATURATION
   0,                   // PRISM_COUNT
-  true,                // BASE_COAT
+  false,               // BASE_COAT
   0.00,                // VU_LEVEL_FLOOR
+  1,                   // LUMOS_ORDER
 };
 
 conf CONFIG_DEFAULTS; // Used for resetting to default values at runtime
@@ -195,14 +197,15 @@ CRGB leds_aux [128];
 CRGB leds_fade[128];
 */
 
-CRGB16  leds_16[128];
-CRGB16  leds_16_prev[128];
-CRGB16  leds_16_fx[128];
-CRGB16  leds_16_fx_2[128];
-CRGB16  leds_16_temp[128];
-CRGB16  leds_16_ui[128];
+// WARNING !! something is running over the end if one of these objects; crashing in intro_animation()
+CRGB16  leds_16[NATIVE_RESOLUTION+1];
+CRGB16  leds_16_prev[NATIVE_RESOLUTION+1];
+CRGB16  leds_16_fx[NATIVE_RESOLUTION+1];
+CRGB16  leds_16_fx_2[NATIVE_RESOLUTION+1];
+CRGB16  leds_16_temp[NATIVE_RESOLUTION+1];
+CRGB16  leds_16_ui[NATIVE_RESOLUTION+1];
 
-SQ15x16 ui_mask[128];
+SQ15x16 ui_mask[NATIVE_RESOLUTION+1];
 SQ15x16 ui_mask_height = 0.0;
 
 CRGB16 *leds_scaled;

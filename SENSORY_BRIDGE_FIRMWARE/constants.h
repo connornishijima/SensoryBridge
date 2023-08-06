@@ -66,6 +66,29 @@ const float notes[] = {
 
 // GPIO PINS #######################################################
 
+#if (defined(LUMOSSTICK) || defined(LUMOSRING))  // LUMOS STICK or LOMOS RING PINS
+#define I2S_BCLK_PIN    13 // labeled SCK on INMP441
+#define I2S_LRCLK_PIN   14 // labeled WS  on INMP441
+#define I2S_DIN_PIN     10 // labeled SD  on INMP441
+// NOTE: L/R on the INMP441 needs to be HIGH. Solder a wire from VDD to L/R on the microphone
+
+#ifdef LUMOSSTICK
+#define LED_DATA_PIN    33    // this is just the first pin of 7 on the LumosStick
+#define LUMOS_LEN       40		// each segment has 40 LEDs
+#define LUMOS_SEGMENTS  7     // there are 7 segments, each has its own control pin
+#define TOTAL_LED_COUNT (LUMOS_SEGMENTS * LUMOS_LEN)
+#else
+#define LED_DATA_PIN    16    // this is just the ring pin on the LumosRing (the block is pin 17)
+#define TOTAL_LED_COUNT 240   // the LumosRing is made of of 60 bands of 4 LEDs each, all in series
+#endif
+
+#define NOISE_CAL_PIN   11    // SW1
+#define MODE_PIN        12    // SW2
+
+#define NO_SWEET_SPOT         // disable sweet spot code
+#define LUMOS_DEVICE          // simplify remaining conditional code
+
+#else                                         // SENSORY BRIDGE PINs
 #define PHOTONS_PIN 1
 #define CHROMA_PIN 2
 #define MOOD_PIN 3
@@ -76,8 +99,9 @@ const float notes[] = {
 
 #define LED_DATA_PIN 36
 #define LED_CLOCK_PIN 37
+#define TOTAL_LED_COUNT 128
 
-#define RNG_SEED_PIN 10
+#define RNG_SEED_PIN 10 // no longer used
 
 #define NOISE_CAL_PIN 11
 #define MODE_PIN 45
@@ -85,6 +109,8 @@ const float notes[] = {
 #define SWEET_SPOT_LEFT_PIN 7
 #define SWEET_SPOT_CENTER_PIN 8
 #define SWEET_SPOT_RIGHT_PIN 9
+
+#endif
 
 // OTHER #######################################################
 

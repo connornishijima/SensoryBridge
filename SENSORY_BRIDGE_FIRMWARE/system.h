@@ -6,6 +6,8 @@ void reboot() {
   led_thread_halt = true;
   USBSerial.println("--- ! REBOOTING to apply changes (You may need to restart the Serial Monitor)");
   USBSerial.flush();
+  delay(100); // allow time for serial messages to be transmitted
+
   for(float i = 1.0; i >= 0.0; i-=0.05){
     MASTER_BRIGHTNESS = i;
     run_sweet_spot();
@@ -140,7 +142,7 @@ void enable_usb_update_mode() {
 void init_usb() {
   USB.productName("Sensory Bridge");  // Doesn't work, not my fault
   USB.manufacturerName("Lixie Labs"); // Doesn't work, not my fault
-  USB.VID(0x1209); // This works though, god damn I hate USB
+  USB.VID(0x1209); // This works though, gosh darn I hate USB
   USB.PID(0xABED); // Cool, cool cool cool https://pid.codes/1209/ABED/
 
   USB.begin();
@@ -149,13 +151,18 @@ void init_usb() {
 
 void init_sweet_spot() {
   ledcSetup(SWEET_SPOT_LEFT_CHANNEL, 500, 12);
-  ledcAttachPin(SWEET_SPOT_LEFT_PIN, SWEET_SPOT_LEFT_CHANNEL);
-
   ledcSetup(SWEET_SPOT_CENTER_CHANNEL, 500, 12);
-  ledcAttachPin(SWEET_SPOT_CENTER_PIN, SWEET_SPOT_CENTER_CHANNEL);
-
   ledcSetup(SWEET_SPOT_RIGHT_CHANNEL, 500, 12);
+
+#ifdef SWEET_SPOT_LEFT_PIN
+  ledcAttachPin(SWEET_SPOT_LEFT_PIN, SWEET_SPOT_LEFT_CHANNEL);
+#endif
+#ifdef SWEET_SPOT_CENTER_PIN
+  ledcAttachPin(SWEET_SPOT_CENTER_PIN, SWEET_SPOT_CENTER_CHANNEL);
+#endif
+#ifdef SWEET_SPOT_RIGHT_PIN
   ledcAttachPin(SWEET_SPOT_RIGHT_PIN, SWEET_SPOT_RIGHT_CHANNEL);
+#endif
 }
 
 void generate_a_weights() {
@@ -259,14 +266,14 @@ void debug_function_timing(uint32_t t_now) {
   static uint32_t last_timing_print = t_now;
 
   if (t_now - last_timing_print >= 30000) {
-    USBSerial.println("------------");
-    for (uint8_t i = 0; i < 16; i++) {
-      USBSerial.print(i);
-      USBSerial.print(": ");
-      USBSerial.println(function_hits[i]);
+      USBSerial.println("------------");
+      for (uint8_t i = 0; i < 16; i++) {
+        USBSerial.print(i);
+        USBSerial.print(": ");
+        USBSerial.println(function_hits[i]);
 
-      function_hits[i] = 0;
-    }
+        function_hits[i] = 0;
+      }
 
     last_timing_print = t_now;
   }
@@ -286,6 +293,10 @@ void init_system() {
   pinMode(noise_button.pin, INPUT_PULLUP);
   pinMode(mode_button.pin, INPUT_PULLUP);
 
+  pinMode(16, OUTPUT);
+  digitalWrite(16, HIGH);
+
+
   memcpy(&CONFIG_DEFAULTS, &CONFIG, sizeof(CONFIG)); // Copy defaults values to second CONFIG object
 
   set_mode_name(0, "GDFT");
@@ -295,7 +306,7 @@ void init_system() {
   set_mode_name(4, "VU");
   set_mode_name(5, "VU (DOT)");
 
-  init_serial(SERIAL_BAUD);
+  init_serial(SERIAL_BAUD); // init serial as early as possible for debugging
   init_sweet_spot();
   init_fs();
 

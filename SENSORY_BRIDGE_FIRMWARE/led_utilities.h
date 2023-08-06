@@ -235,6 +235,14 @@ void quantize_color(bool temporal_dithering) {
     noise_origin_b += 1;
 
     for (uint16_t i = 0; i < CONFIG.LED_COUNT; i += 1) {
+  	  uint16_t out_i = i;
+#if defined(LUMOSSTICK)
+      if (CONFIG.LUMOS_ORDER) {
+    	  // we map the rows of LumosStick LEDs
+        out_i = ((i % LUMOS_SEGMENTS) * LUMOS_LEN) + (i / LUMOS_SEGMENTS);
+      }
+#endif
+
       // RED #####################################################
       SQ15x16 decimal_r = leds_scaled[i].r * SQ15x16(254);
       SQ15x16 whole_r = decimal_r.getInteger();
@@ -244,7 +252,7 @@ void quantize_color(bool temporal_dithering) {
         whole_r += SQ15x16(1);
       }
 
-      leds_out[i].r = whole_r.getInteger();
+      leds_out[out_i].r = whole_r.getInteger();
 
       // GREEN ###################################################
       SQ15x16 decimal_g = leds_scaled[i].g * SQ15x16(254);
@@ -255,7 +263,7 @@ void quantize_color(bool temporal_dithering) {
         whole_g += SQ15x16(1);
       }
 
-      leds_out[i].g = whole_g.getInteger();
+      leds_out[out_i].g = whole_g.getInteger();
 
       // BLUE ####################################################
       SQ15x16 decimal_b = leds_scaled[i].b * SQ15x16(254);
@@ -266,15 +274,43 @@ void quantize_color(bool temporal_dithering) {
         whole_b += SQ15x16(1);
       }
 
-      leds_out[i].b = whole_b.getInteger();
+      leds_out[out_i].b = whole_b.getInteger();
     }
   } else {
     for (uint16_t i = 0; i < CONFIG.LED_COUNT; i += 1) {
-      leds_out[i].r = uint8_t(leds_scaled[i].r * 255);
-      leds_out[i].g = uint8_t(leds_scaled[i].g * 255);
-      leds_out[i].b = uint8_t(leds_scaled[i].b * 255);
+  	  uint16_t out_i = i;
+#if defined(LUMOSSTICK)
+      if (CONFIG.LUMOS_ORDER) {
+    	  // we map the rows of LumosStick LEDs
+        out_i = ((i % LUMOS_SEGMENTS) * LUMOS_LEN) + (i / LUMOS_SEGMENTS);
+      }
+#endif
+      leds_out[out_i].r = uint8_t(leds_scaled[i].r * 255);
+      leds_out[out_i].g = uint8_t(leds_scaled[i].g * 255);
+      leds_out[out_i].b = uint8_t(leds_scaled[i].b * 255);
     }
   }
+
+#if 0 // #if defined(LUMOSSTICK)
+	// TEMPORARY HACK: the last two LEDs are calculated incorrectly
+	// it is likely some artifact of the 280 LEDs vs the original 128
+ 	uint16_t src_i = (CONFIG.LED_COUNT - 3);
+  if (CONFIG.LUMOS_ORDER) {
+		  // we map the rows of LumosStick LEDs
+  	src_i = ((src_i % LUMOS_SEGMENTS) * LUMOS_LEN) + (src_i / LUMOS_SEGMENTS);
+  }
+	for (uint16_t i = 0; i < 2; i++) {
+	  uint16_t tgt_i = (CONFIG.LED_COUNT - 1) - i;
+    if (CONFIG.LUMOS_ORDER) {
+		  // we map the rows of LumosStick LEDs
+  		tgt_i = ((tgt_i % LUMOS_SEGMENTS) * LUMOS_LEN) + (tgt_i / LUMOS_SEGMENTS);
+    }
+		// copy the last good LED to the otehr two
+		leds_out[tgt_i].r = leds_out[src_i].r;
+		leds_out[tgt_i].g = leds_out[src_i].g;
+		leds_out[tgt_i].b = leds_out[src_i].b;
+	}
+#endif
 }
 
 void apply_incandescent_filter() {
@@ -693,8 +729,28 @@ void show_leds() {
 void init_leds() {
   bool leds_started = false;
 
+  USBSerial.print("INIT_LEDS: ");
+
   leds_scaled = new CRGB16[CONFIG.LED_COUNT];
   leds_out = new CRGB[CONFIG.LED_COUNT];
+
+#ifdef LUMOSSTICK
+  USBSerial.print(" LUMOSSTICK ");
+  if (CONFIG.LED_COUNT != (LUMOS_LEN * LUMOS_SEGMENTS)) {
+      USBSerial.println(" LED COUNT MISMATCH ");
+      delay(100); // allow time for serial messages to be transmitted      
+  }
+
+	// can not do this in a loop since the FastLED declaration is performed at compile time
+	FastLED.addLeds<WS2812B, LED_DATA_PIN+0, GRB>(leds_out, 0*LUMOS_LEN, LUMOS_LEN);
+	FastLED.addLeds<WS2812B, LED_DATA_PIN+1, GRB>(leds_out, 1*LUMOS_LEN, LUMOS_LEN);
+	FastLED.addLeds<WS2812B, LED_DATA_PIN+2, GRB>(leds_out, 2*LUMOS_LEN, LUMOS_LEN);
+	FastLED.addLeds<WS2812B, LED_DATA_PIN+3, GRB>(leds_out, 3*LUMOS_LEN, LUMOS_LEN);
+	FastLED.addLeds<WS2812B, LED_DATA_PIN+4, GRB>(leds_out, 4*LUMOS_LEN, LUMOS_LEN);
+	FastLED.addLeds<WS2812B, LED_DATA_PIN+5, GRB>(leds_out, 5*LUMOS_LEN, LUMOS_LEN);
+	FastLED.addLeds<WS2812B, LED_DATA_PIN+6, GRB>(leds_out, 6*LUMOS_LEN, LUMOS_LEN);
+
+#else
 
   if (CONFIG.LED_TYPE == LED_NEOPIXEL) {
     if (CONFIG.LED_COLOR_ORDER == RGB) {
@@ -716,16 +772,17 @@ void init_leds() {
     }
   }
 
-  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, CONFIG.MAX_CURRENT_MA);
+#endif
 
-  for (uint8_t x = 0; x < CONFIG.LED_COUNT; x++) {
+  FastLED.setMaxPowerInVoltsAndMilliamps(5.0, CONFIG.MAX_CURRENT_MA); // we do our own dithering so this does not have any effect
+
+  for (uint16_t x = 0; x < CONFIG.LED_COUNT; x++) {
     leds_out[x] = CRGB(0, 0, 0);
   }
   show_leds();
 
   leds_started = true;
 
-  USBSerial.print("INIT_LEDS: ");
   USBSerial.println(leds_started == true ? PASS : FAIL);
 }
 
@@ -858,25 +915,25 @@ void intro_animation() {
     float speed;
     CRGB16 col;
   };
-  particle particles[particle_count];
+  particle particles[particle_count*2];
 
-  for (uint8_t i = 0; i < particle_count; i++) {
-    float prog = i / float(particle_count);
-    particles[i].phase = 0.0;
-    particles[i].speed = 0.002 * (i + 1);
-    particles[i].col = hsv(prog, CONFIG.SATURATION, 1.0);
+  for (uint8_t p = 0; p < particle_count; p++) {
+    float prog = p / float(particle_count);
+    particles[p].phase = 0.0;
+    particles[p].speed = 0.002 * (p + 1);
+    particles[p].col = hsv(prog, CONFIG.SATURATION, 1.0);
   }
   MASTER_BRIGHTNESS = 1.0;
   float center_brightness = 0.0;
 
-  for (uint16_t i = 0; i < 50; i++) {
+  for (uint16_t j = 0; j < 50; j++) {
     if (center_brightness < 1.0) {
       center_brightness += 0.2;
       ledcWrite(SWEET_SPOT_CENTER_CHANNEL, (center_brightness * center_brightness) * 4096);
     }
 
     float dimming = 1.0;
-    float anim_prog = i / 50.0;
+    float anim_prog = j / 50.0;
     if (anim_prog >= 0.5) {
       anim_prog = (anim_prog - 0.5) * 2.0;
       dimming = 1.0 - anim_prog;
@@ -919,6 +976,7 @@ void intro_animation() {
     show_leds();
     FastLED.delay(1);
   }
+
   MASTER_BRIGHTNESS = 0.0;
   ledcWrite(SWEET_SPOT_LEFT_CHANNEL, 0);
   ledcWrite(SWEET_SPOT_CENTER_CHANNEL, 0);

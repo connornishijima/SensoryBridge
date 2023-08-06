@@ -200,6 +200,9 @@ void dump_info() {
   USBSerial.print("CONFIG.BASE_COAT: ");
   USBSerial.println(CONFIG.BASE_COAT);
 
+  USBSerial.print("CONFIG.LUMOS_ORDER: ");
+  USBSerial.println(CONFIG.LUMOS_ORDER);
+
   USBSerial.print("MASTER_BRIGHTNESS: ");
   USBSerial.println(MASTER_BRIGHTNESS);
 
@@ -266,6 +269,8 @@ void dump_info() {
 
 // This parses a completed command to decide how to handle it
 void parse_command(char* command_buf) {
+  uint32_t t_now_us = micros();        // Timestamp for this loop, used by some core functions
+  uint32_t t_now = t_now_us / 1000.0;  // Millisecond version
 
   // COMMANDS WITHOUT METADATA ###############################
 
@@ -299,8 +304,10 @@ void parse_command(char* command_buf) {
     USBSerial.println("                               get_num_modes | Return the number of modes available");
     USBSerial.println("                             start_noise_cal | Remotely begin a noise calibration");
     USBSerial.println("                             clear_noise_cal | Remotely clear the stored noise calibration");
+		USBSerial.println("                               get_noise_cal | Return the stored noise calibration");
     USBSerial.println("                                    identify | Flashes the LEDs twice in yellow");
     USBSerial.println("                              set_mode=[int] | Set the mode number");
+    USBSerial.println("             columnwize=[true/false/default] | Set the LED order to columns first (only for LumosStick)");
     USBSerial.println("         mirror_enabled=[true/false/default] | Remotely toggle lightshow mirroring");
     USBSerial.println("          reverse_order=[true/false/default] | Toggle whether image is flipped upside down before final rendering");
     USBSerial.println("                         get_mode_name=[int] | Get a mode's name by ID (index)");
@@ -320,6 +327,8 @@ void parse_command(char* command_buf) {
     USBSerial.println("                  set_main_unit=[true/false] | Sets if this unit is MAIN or not for SensorySync");
     USBSerial.println("           sweet_spot_min=[int or 'default'] | Sets the minimum amplitude to be inside the 'Sweet Spot'");
     USBSerial.println("           sweet_spot_max=[int or 'default'] | Sets the maximum amplitude to be inside the 'Sweet Spot'");
+		USBSerial.println("                photons=[float or 'default'] | Sets the photons knob value  (0.0 .. 1.0) aka brightness");
+		USBSerial.println("                   mood=[float or 'default'] | Sets the mood knob value (0.0 .. 1.0) aka smoothing");
     USBSerial.println("        chromagram_range=[1-64 or 'default'] | Range between 1 and 64, how many notes at the bottom of the");
     USBSerial.println("                                               spectrogram should be considered in chromagram sums");
     USBSerial.println("        standby_dimming=[true/false/default] | Toggle dimming during detected silence");
@@ -401,6 +410,16 @@ void parse_command(char* command_buf) {
     clear_noise_cal();
 
   }
+
+	// return configs -----------------------------------------
+	else if (strcmp(command_buf, "get_noise_cal") == 0) {
+
+		ack();
+		for (uint16_t i = 0; i < NUM_FREQS; i++) {
+    		USBSerial.printf("Freq %6.1f = %8.4f\n", notes[i], float(noise_samples[i]));
+  		}
+
+	}
 
   // Returns the number of modes available ------------------
   else if (strcmp(command_buf, "get_num_modes") == 0) {
@@ -673,6 +692,31 @@ void parse_command(char* command_buf) {
       USBSerial.print("CONFIG.LIGHTSHOW_MODE: ");
       USBSerial.println(mode_destination);
       tx_end();
+    }
+
+    // Set Columnwize (for LumosStick only) ----------------------
+    else if (strcmp(command_type, "columnwize") == 0) {
+      bool good = false;
+      if (strcmp(command_data, "default") == 0) {
+        CONFIG.LUMOS_ORDER = CONFIG_DEFAULTS.LUMOS_ORDER;
+        good = true;
+      } else if (strcmp(command_data, "true") == 0) {
+        CONFIG.LUMOS_ORDER = true;
+        good = true;
+      } else if (strcmp(command_data, "false") == 0) {
+        CONFIG.LUMOS_ORDER = false;
+        good = true;
+      } else {
+        bad_command(command_type, command_data);
+      }
+
+      if (good) {
+        save_config_delayed();
+        tx_begin();
+        USBSerial.print("CONFIG.LUMOS_ORDER: ");
+        USBSerial.println(CONFIG.LUMOS_ORDER);
+        tx_end();
+      }
     }
 
     // Get Mode Name By ID ------------------------------------
@@ -986,6 +1030,40 @@ void parse_command(char* command_buf) {
       tx_end();
     }
 
+    // Set photons knob value -------------------
+		else if (strcmp(command_type, "photons") == 0) {
+      float value;
+			if (strcmp(command_data, "default") == 0) {
+				value = CONFIG_DEFAULTS.PHOTONS;
+			} else {
+				value = constrain(atof(command_data), 0.01, 1.0);
+			}
+
+			update_photons_chroma_mood(t_now, value, -1.0, -1.0);
+			save_config_delayed();
+			tx_begin();
+			USBSerial.print("CONFIG.PHOTONS: ");
+			USBSerial.println(CONFIG.PHOTONS);
+			tx_end();
+		}
+
+    // Set mood knob value -------------------
+		else if (strcmp(command_type, "mood") == 0) {
+      float value;
+			if (strcmp(command_data, "default") == 0) {
+				value = CONFIG_DEFAULTS.MOOD;
+			} else {
+				value = constrain(atof(command_data), 0.01, 1.0);
+			}
+
+			update_photons_chroma_mood(t_now, -1.0, -1.0, value);
+			save_config_delayed();
+			tx_begin();
+			USBSerial.print("CONFIG.MOOD: ");
+			USBSerial.println(CONFIG.MOOD);
+			tx_end();
+		}
+
     // Set Chromagram Range ---------------
     else if (strcmp(command_type, "chromagram_range") == 0) {
       if (strcmp(command_data, "default") == 0) {
@@ -1290,7 +1368,7 @@ void check_serial(uint32_t t_now) {
   serial_iter++;
   if (USBSerial.available() > 0) {
     char c = USBSerial.read();
-    if (c != '\n') {  // If normal character, add to buffer
+		if ((c != '\r') && (c != '\n')) { // If normal character, add to buffer
       command_buf[command_buf_index] = c;
       command_buf_index++;
 
@@ -1299,11 +1377,13 @@ void check_serial(uint32_t t_now) {
         command_buf_index = 127;
       }
 
-    } else {  // If a newline character is received,
-      // the command in the buffer should be parsed
-      parse_command(command_buf);                   // Parse
-      memset(&command_buf, 0, sizeof(char) * 128);  // Clear
-      command_buf_index = 0;                        // Reset
+    } else {  // a newline or linefeed character received,
+			if (command_buf_index) {  // if we have any characters ...
+        // the command in the buffer should be parsed
+        parse_command(command_buf);                   // Parse
+        memset(&command_buf, 0, sizeof(char) * 128);  // Clear
+        command_buf_index = 0;                        // Reset
+      }
     }
   }
 }

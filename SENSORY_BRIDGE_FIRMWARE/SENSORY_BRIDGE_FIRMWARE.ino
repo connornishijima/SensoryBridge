@@ -54,6 +54,9 @@
 //                       MmmPP     M = Major version, m = Minor version, P = Patch version
 //                                 (i.e 3.5.4 would be 30504)
 
+#define LUMOSSTICK  // controls hardware configuration for the LumosStick
+//#define LUMOSRING   // controls hardware configuration for the LumosRing
+
 // Lightshow modes by name -----------------------------------------------------------
 enum lightshow_modes {
   LIGHT_MODE_GDFT,  // ------------- GDFT - Goertzel-based Discrete Fourier Transform
@@ -167,7 +170,7 @@ void loop() {
   log_fps(t_now_us);  // (system.h)
   // Log the audio system FPS
 
-  if (debug_mode == true) {
+  if (debug_mode) {
     function_id = 31;
     debug_function_timing(t_now);
   }
