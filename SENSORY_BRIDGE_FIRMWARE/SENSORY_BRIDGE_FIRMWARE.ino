@@ -54,8 +54,11 @@
 //                       MmmPP     M = Major version, m = Minor version, P = Patch version
 //                                 (i.e 3.5.4 would be 30504)
 
+
+// SensoryBridge will run on the LumosStick and the LumosRing. To use either, uncomment only one of the following lines
 #define LUMOSSTICK  // controls hardware configuration for the LumosStick
 //#define LUMOSRING   // controls hardware configuration for the LumosRing
+
 
 // Lightshow modes by name -----------------------------------------------------------
 enum lightshow_modes {

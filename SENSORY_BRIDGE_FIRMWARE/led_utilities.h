@@ -291,25 +291,31 @@ void quantize_color(bool temporal_dithering) {
     }
   }
 
-#if 0 // #if defined(LUMOSSTICK)
-	// TEMPORARY HACK: the last two LEDs are calculated incorrectly
-	// it is likely some artifact of the 280 LEDs vs the original 128
- 	uint16_t src_i = (CONFIG.LED_COUNT - 3);
-  if (CONFIG.LUMOS_ORDER) {
-		  // we map the rows of LumosStick LEDs
-  	src_i = ((src_i % LUMOS_SEGMENTS) * LUMOS_LEN) + (src_i / LUMOS_SEGMENTS);
-  }
-	for (uint16_t i = 0; i < 2; i++) {
-	  uint16_t tgt_i = (CONFIG.LED_COUNT - 1) - i;
+#if 0
+  if (CONFIG.LED_COUNT >= 240) {
+    // TEMPORARY HACK: the last two LEDs are calculated incorrectly
+    // it is likely some artifact of the 280 LEDs vs the original 128
+    uint16_t src_i = (CONFIG.LED_COUNT - 3);
+#if defined(LUMOSSTICK)
     if (CONFIG.LUMOS_ORDER) {
-		  // we map the rows of LumosStick LEDs
-  		tgt_i = ((tgt_i % LUMOS_SEGMENTS) * LUMOS_LEN) + (tgt_i / LUMOS_SEGMENTS);
+        // we map the rows of LumosStick LEDs
+      src_i = ((src_i % LUMOS_SEGMENTS) * LUMOS_LEN) + (src_i / LUMOS_SEGMENTS);
     }
-		// copy the last good LED to the otehr two
-		leds_out[tgt_i].r = leds_out[src_i].r;
-		leds_out[tgt_i].g = leds_out[src_i].g;
-		leds_out[tgt_i].b = leds_out[src_i].b;
-	}
+#endif
+    for (uint16_t i = 0; i < 2; i++) {
+      uint16_t tgt_i = (CONFIG.LED_COUNT - 1) - i;
+#if defined(LUMOSSTICK)
+      if (CONFIG.LUMOS_ORDER) {
+        // we map the rows of LumosStick LEDs
+        tgt_i = ((tgt_i % LUMOS_SEGMENTS) * LUMOS_LEN) + (tgt_i / LUMOS_SEGMENTS);
+      }
+#endif
+      // copy the last good LED to the otehr two
+      leds_out[tgt_i].r = leds_out[src_i].r;
+      leds_out[tgt_i].g = leds_out[src_i].g;
+      leds_out[tgt_i].b = leds_out[src_i].b;
+    }
+  }
 #endif
 }
 
@@ -763,6 +769,7 @@ void init_leds() {
   }
 
   else if (CONFIG.LED_TYPE == LED_DOTSTAR) {
+#ifdef  LED_CLOCK_PIN
     if (CONFIG.LED_COLOR_ORDER == RGB) {
       FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, CONFIG.LED_COUNT);
     } else if (CONFIG.LED_COLOR_ORDER == GRB) {
@@ -770,6 +777,9 @@ void init_leds() {
     } else if (CONFIG.LED_COLOR_ORDER == BGR) {
       FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, BGR>(leds_out, CONFIG.LED_COUNT);
     }
+#else
+    USBSerial.println("ERROR: No LED_CLOCK_PIN defined");
+#endif
   }
 
 #endif
