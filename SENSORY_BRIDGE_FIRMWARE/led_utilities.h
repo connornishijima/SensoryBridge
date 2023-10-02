@@ -616,10 +616,14 @@ void render_ui() {
 
 void scale_to_strip() {
   if (CONFIG.LED_COUNT == NATIVE_RESOLUTION) {
-    for (SQ15x16 i = 0; i < CONFIG.LED_COUNT; i++) {
-      //memcpy(leds_scaled, leds_16, sizeof(CRGB16)*NATIVE_RESOLUTION);
-      leds_scaled[i.getInteger()] = leds_16[i.getInteger()];
-    }
+    // TODO: Potential cause of "Stuck Green LED"
+    //
+    // Why did I do a for() loop instead of memcpy?
+    // Is this causing the green LED bug in unmirrored mode?
+    //for (SQ15x16 i = 0; i < CONFIG.LED_COUNT; i++) {
+      memcpy(leds_scaled, leds_16, sizeof(CRGB16)*NATIVE_RESOLUTION);
+      //leds_scaled[i.getInteger()] = leds_16[i.getInteger()];
+    //}
   } else {
     for (SQ15x16 i = 0; i < CONFIG.LED_COUNT; i++) {
       SQ15x16 prog = i / SQ15x16(CONFIG.LED_COUNT);
