@@ -224,10 +224,8 @@ void led_thread(void* arg) {
       }
 
       show_leds();  // This sends final RGB data to the LEDS (led_utilities.h)
-      LED_FPS = FastLED.getFPS();
+      LED_FPS = FastLED.getFPS(); 
     }
-    else{
-      vTaskDelay(0);
-    }
+    vTaskDelay(1);
   }
 }
