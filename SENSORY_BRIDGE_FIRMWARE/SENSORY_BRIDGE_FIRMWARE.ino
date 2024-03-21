@@ -104,7 +104,7 @@ void setup() {
   init_system();  // (system.h) Initialize all hardware and arrays
 
   // Create thread specifically for LED updates
-  xTaskCreatePinnedToCore(led_thread, "led_task", 4096, NULL, tskIDLE_PRIORITY + 1, &led_task, 1);
+  xTaskCreatePinnedToCore(led_thread, "led_task", 8192, NULL, tskIDLE_PRIORITY + 1, &led_task, 1);
 }
 
 // Loop, runs forever after setup() --------------------------------------------------
