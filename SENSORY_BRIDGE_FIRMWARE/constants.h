@@ -195,6 +195,7 @@ const SQ15x16 hue_lookup[64][3] = {
 
 enum led_types {
   LED_NEOPIXEL,
+  LED_NEOPIXEL_X2,
   LED_DOTSTAR
 };
 

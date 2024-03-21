@@ -3,7 +3,7 @@ extern void run_sweet_spot();
 extern void show_leds();
 
 void reboot() {
-  led_thread_halt = true;
+  lock_leds();
   USBSerial.println("--- ! REBOOTING to apply changes (You may need to restart the Serial Monitor)");
   USBSerial.flush();
   for(float i = 1.0; i >= 0.0; i-=0.05){
@@ -297,6 +297,7 @@ void init_system() {
 
   init_serial(SERIAL_BAUD);
   init_sweet_spot();
+  
   init_fs();
 
   // NOISE and MODE held down on boot

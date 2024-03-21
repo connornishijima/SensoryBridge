@@ -150,7 +150,6 @@ void IRAM_ATTR process_GDFT() {
   memcpy(magnitudes_last, magnitudes_final, sizeof(float) * NUM_FREQS);
 
   /*
-
   // When enabled, streams magnitudes[] array over Serial
   if (stream_magnitudes == true) {
     if (serial_iter >= 2) {  // Don't print every frame

@@ -50,7 +50,7 @@
 
   ---------------------------------------------------------------------*/
 
-#define FIRMWARE_VERSION 40000  // Try "V" on the Serial port for this!
+#define FIRMWARE_VERSION 40101  // Try "V" on the Serial port for this!
 //                       MmmPP     M = Major version, m = Minor version, P = Patch version
 //                                 (i.e 3.5.4 would be 30504)
 
@@ -228,12 +228,6 @@ void led_thread(void* arg) {
     }
     else{
       vTaskDelay(0);
-    }
-
-    if (CONFIG.LED_TYPE == LED_NEOPIXEL) {
-      //vTaskDelay(1); // delay for 1ms to avoid hogging the CPU
-    } else if (CONFIG.LED_TYPE == LED_DOTSTAR) {  // More delay to compensate for faster LEDs
-      //vTaskDelay(3);                              // delay for 3ms to avoid hogging the CPU
     }
   }
 }

@@ -103,3 +103,7 @@ SQ15x16 fmod_fixed(SQ15x16 dividend, SQ15x16 divisor) {
     SQ15x16 quotient = dividend / divisor;
     return dividend - (divisor * floorFixed(quotient));
 }
+
+float clip_float(float input){
+  return min(1.0f, max(0.0f, input));
+}

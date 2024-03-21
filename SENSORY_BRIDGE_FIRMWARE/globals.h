@@ -76,7 +76,7 @@ conf CONFIG = {
   0.00,                // BULB_OPACITY
   1.00,                // SATURATION
   0,                   // PRISM_COUNT
-  true,                // BASE_COAT
+  false,               // BASE_COAT
   0.00,                // VU_LEVEL_FLOOR
 };
 
@@ -351,3 +351,12 @@ char config_filename[24];
 
 float MASTER_BRIGHTNESS = 0.0;
 float last_sample = 0;
+
+void lock_leds(){
+  //led_thread_halt = true;
+  //delay(20); // Potentially waiting for LED thread to finish its loop
+}
+
+void unlock_leds(){
+ //led_thread_halt = false;
+}

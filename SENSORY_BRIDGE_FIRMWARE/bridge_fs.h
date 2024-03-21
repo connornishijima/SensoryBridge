@@ -10,6 +10,7 @@ void update_config_filename(uint32_t input) {
 
 // Restore all defaults defined in globals.h by removing saved data and rebooting
 void factory_reset() {
+  lock_leds();
   USBSerial.print("Deleting ");
   USBSerial.print(config_filename);
   USBSerial.print(": ");
@@ -32,6 +33,7 @@ void factory_reset() {
 
 // Restore only configuration defaults
 void restore_defaults() {
+  lock_leds();
   USBSerial.print("Deleting ");
   USBSerial.print(config_filename);
   USBSerial.print(": ");
@@ -47,6 +49,7 @@ void restore_defaults() {
 
 // Save configuration to LittleFS
 void save_config() {
+  lock_leds();
   if (debug_mode) {
     USBSerial.print("LITTLEFS: ");
   }
@@ -74,6 +77,7 @@ void save_config() {
     }
   }
   file.close();
+  unlock_leds();
 }
 
 // Save configuration to LittleFS 10 seconds from now
@@ -87,6 +91,7 @@ void save_config_delayed() {
 
 // Load configuration from LittleFS
 void load_config() {
+  lock_leds();
   if (debug_mode) {
     USBSerial.print("LITTLEFS: ");
   }
@@ -118,10 +123,12 @@ void load_config() {
   if (queue_factory_reset == true) {
     factory_reset();
   }
+  unlock_leds();
 }
 
 // Save noise calibration to LittleFS
 void save_ambient_noise_calibration() {
+  lock_leds();
   if (debug_mode) {
     USBSerial.print("SAVING AMBIENT_NOISE PROFILE... ");
   }
@@ -151,10 +158,13 @@ void save_ambient_noise_calibration() {
   if (debug_mode) {
     USBSerial.println("SAVE COMPLETE");
   }
+
+  unlock_leds();
 }
 
 // Load noise calibration from LittleFS
 void load_ambient_noise_calibration() {
+  lock_leds();
   if (debug_mode) {
     USBSerial.print("LOADING AMBIENT_NOISE PROFILE... ");
   }
@@ -182,10 +192,13 @@ void load_ambient_noise_calibration() {
   if (debug_mode) {
     USBSerial.println("LOAD COMPLETE");
   }
+
+  unlock_leds();
 }
 
 // Initialize LittleFS
 void init_fs() {
+  lock_leds();
   USBSerial.print("INIT FILESYSTEM: ");
   USBSerial.println(LittleFS.begin(true) == true ? PASS : FAIL);
 
@@ -193,4 +206,5 @@ void init_fs() {
 
   load_ambient_noise_calibration();
   load_config();
+  unlock_leds();
 }

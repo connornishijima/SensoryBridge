@@ -4,21 +4,24 @@
 
 #include <driver/i2s.h>
 
-const i2s_config_t i2s_config = { // Many of these settings are defined in (constants.h)
+const i2s_config_t i2s_config = {
+  // Many of these settings are defined in (constants.h)
   .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
   .sample_rate = CONFIG.SAMPLE_RATE,
   .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
   .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
-  .communication_format = (i2s_comm_format_t) (I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
+  .communication_format = (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
+  //.intr_alloc_flags = 0,
   .dma_buf_count = 2,
-  .dma_buf_len = CONFIG.SAMPLES_PER_CHUNK
+  .dma_buf_len = CONFIG.SAMPLES_PER_CHUNK,
+  //.use_apll = true,
 };
 
-const i2s_pin_config_t pin_config = { // These too
-  .bck_io_num   = I2S_BCLK_PIN,
-  .ws_io_num    = I2S_LRCLK_PIN,
+const i2s_pin_config_t pin_config = {  // These too
+  .bck_io_num = I2S_BCLK_PIN,
+  .ws_io_num = I2S_LRCLK_PIN,
   .data_out_num = -1,  // not used (only for outputs)
-  .data_in_num  = I2S_DIN_PIN
+  .data_in_num = I2S_DIN_PIN
 };
 
 void init_i2s() {
@@ -40,10 +43,10 @@ void init_i2s() {
 }
 
 void acquire_sample_chunk(uint32_t t_now) {
-  static int8_t   sweet_spot_state_last = 0;
-  static bool     silence_temp = false;
+  static int8_t sweet_spot_state_last = 0;
+  static bool silence_temp = false;
   static uint32_t silence_switched = 0;
-  static float    silent_scale_last = 1.0;
+  static float silent_scale_last = 1.0;
 
   size_t bytes_read = 0;
   i2s_read(I2S_PORT, i2s_samples_raw, CONFIG.SAMPLES_PER_CHUNK * sizeof(int32_t), &bytes_read, portMAX_DELAY);
@@ -59,11 +62,13 @@ void acquire_sample_chunk(uint32_t t_now) {
   for (uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++) {
     int32_t sample = (i2s_samples_raw[i] * 0.000512) + 56000 - 5120;
 
-    sample = sample >> 2; // Helps prevent overflow in fixed-point math coming up
+    //USBSerial.println(sample);
 
-    sample *= CONFIG.SENSITIVITY; // Set sensitivity gain
+    sample = sample >> 2;  // Helps prevent overflow in fixed-point math coming up
 
-    if (sample > 32767) { // clipping
+    sample *= CONFIG.SENSITIVITY;  // Set sensitivity gain
+
+    if (sample > 32767) {  // clipping
       sample = 32767;
     } else if (sample < -32767) {
       sample = -32767;
@@ -92,22 +97,20 @@ void acquire_sample_chunk(uint32_t t_now) {
   if (noise_complete == false) {
     dc_offset_sum += waveform[0];
 
-    silent_scale = 1.0; // Force LEDs on during calibration
+    silent_scale = 1.0;  // Force LEDs on during calibration
 
-    if (noise_iterations >= 64 && noise_iterations <= 192) { // sample in the middle of noise cal
-      if (max_waveform_val_raw*1.10 > CONFIG.SWEET_SPOT_MIN_LEVEL) { // Sweet Spot Min threshold should be the silence level + 15%
-        CONFIG.SWEET_SPOT_MIN_LEVEL = max_waveform_val_raw*1.10;
+    if (noise_iterations >= 64 && noise_iterations <= 192) {            // sample in the middle of noise cal
+      if (max_waveform_val_raw * 1.10 > CONFIG.SWEET_SPOT_MIN_LEVEL) {  // Sweet Spot Min threshold should be the silence level + 15%
+        CONFIG.SWEET_SPOT_MIN_LEVEL = max_waveform_val_raw * 1.10;
       }
     }
-  }
-  else {
+  } else {
     max_waveform_val = (max_waveform_val_raw - (CONFIG.SWEET_SPOT_MIN_LEVEL));
-    
+
     if (max_waveform_val > max_waveform_val_follower) {
       float delta = max_waveform_val - max_waveform_val_follower;
       max_waveform_val_follower += delta * 0.25;
-    }
-    else if (max_waveform_val < max_waveform_val_follower) {
+    } else if (max_waveform_val < max_waveform_val_follower) {
       float delta = max_waveform_val_follower - max_waveform_val;
       max_waveform_val_follower -= delta * 0.005;
 
@@ -120,8 +123,7 @@ void acquire_sample_chunk(uint32_t t_now) {
     if (waveform_peak_scaled_raw > waveform_peak_scaled) {
       float delta = waveform_peak_scaled_raw - waveform_peak_scaled;
       waveform_peak_scaled += delta * 0.25;
-    }
-    else if (waveform_peak_scaled_raw < waveform_peak_scaled) {
+    } else if (waveform_peak_scaled_raw < waveform_peak_scaled) {
       float delta = waveform_peak_scaled - waveform_peak_scaled_raw;
       waveform_peak_scaled -= delta * 0.25;
     }
@@ -134,21 +136,19 @@ void acquire_sample_chunk(uint32_t t_now) {
 
     if (max_waveform_val_raw <= CONFIG.SWEET_SPOT_MIN_LEVEL * 1.10) {
       sweet_spot_state = -1;
-      if (sweet_spot_state_last != -1) { // Just became silent
+      if (sweet_spot_state_last != -1) {  // Just became silent
         silence_temp = true;
         silence_switched = t_now;
       }
-    }
-    else if (max_waveform_val_raw >= CONFIG.SWEET_SPOT_MAX_LEVEL) {
+    } else if (max_waveform_val_raw >= CONFIG.SWEET_SPOT_MAX_LEVEL) {
       sweet_spot_state = 1;
-      if (sweet_spot_state_last != 1) { // No longer silent
+      if (sweet_spot_state_last != 1) {  // No longer silent
         silence_temp = false;
         silence_switched = t_now;
       }
-    }
-    else {
+    } else {
       sweet_spot_state = 0;
-      if (sweet_spot_state_last != 0) { // No longer silent
+      if (sweet_spot_state_last != 0) {  // No longer silent
         silence_temp = false;
         silence_switched = t_now;
       }
@@ -158,19 +158,17 @@ void acquire_sample_chunk(uint32_t t_now) {
       if (t_now - silence_switched >= 10000) {
         silence = true;
       }
-    }
-    else {
+    } else {
       silence = false;
     }
 
 
     if (CONFIG.STANDBY_DIMMING == true) {
       // Make silent_scale more slowly track instant change in reality
-      float silent_scale_raw = 1.0 - silence; // Turn off when quiet
+      float silent_scale_raw = 1.0 - silence;  // Turn off when quiet
       silent_scale = silent_scale_raw * 0.1 + silent_scale_last * 0.9;
       silent_scale_last = silent_scale;
-    }
-    else {
+    } else {
       silent_scale = 1.0;
     }
 
@@ -181,7 +179,7 @@ void acquire_sample_chunk(uint32_t t_now) {
       sample_window[i] = waveform[i - (SAMPLE_HISTORY_LENGTH - CONFIG.SAMPLES_PER_CHUNK)];
     }
 
-    for(uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++){
+    for (uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++) {
       waveform_fixed_point[i] = SQ15x16(waveform[i]) / SQ15x16(32768.0);
     }
 
@@ -190,7 +188,7 @@ void acquire_sample_chunk(uint32_t t_now) {
 }
 
 void calculate_vu() {
-    /*
+  /*
     Calculates perceived audio loudness or Volume Unit (VU). Uses root mean square (RMS) method 
     for accurate representation of perceived loudness and incorporates a noise floor calibration.
     If calibration is active, updates noise floor level. If not, subtracts the noise floor from
@@ -208,44 +206,42 @@ void calculate_vu() {
     - noise_cal_active: Indicator of active noise floor calibration.
     */
 
-    SQ15x16 sample_count = CONFIG.SAMPLES_PER_CHUNK;
+  // Store last volume level
+  audio_vu_level_last = audio_vu_level;
 
-    // Store last volume level
-    audio_vu_level_last = audio_vu_level;
-    
-    SQ15x16 sum = 0.0;
+  float sum = 0.0;
 
-    // Compute sum of squares
-    for(uint16_t i = 0; i < sample_count; i++) {
-        sum += waveform_fixed_point[i] * waveform_fixed_point[i];
+  // Compute sum of squares
+  for (uint16_t i = 0; i < CONFIG.SAMPLES_PER_CHUNK; i++) {
+    sum += float(waveform_fixed_point[i] * waveform_fixed_point[i]);
+  }
+
+  // Compute RMS
+  SQ15x16 rms = sqrt(float(sum / CONFIG.SAMPLES_PER_CHUNK));
+
+  // Update volume level
+  audio_vu_level = rms;
+
+  // Check noise calibration
+  if (noise_complete == false) {
+    // If volume level exceeds noise floor, update noise floor
+    if (float(audio_vu_level * 1.5) > CONFIG.VU_LEVEL_FLOOR) {
+      CONFIG.VU_LEVEL_FLOOR = float(audio_vu_level * 1.5);
+    }
+  } else {
+    // Subtract noise floor from volume level
+    audio_vu_level -= CONFIG.VU_LEVEL_FLOOR;
+
+    // Zero out negative volume
+    if (audio_vu_level < 0.0) {
+      audio_vu_level = 0.0;
     }
 
-    // Compute RMS
-    SQ15x16 rms = sqrt(float(sum / sample_count));
-    
-    // Update volume level
-    audio_vu_level = rms;
-    
-    // Check noise calibration
-    if(noise_complete == false){
-        // If volume level exceeds noise floor, update noise floor
-        if(float(audio_vu_level*1.5) > CONFIG.VU_LEVEL_FLOOR){
-            CONFIG.VU_LEVEL_FLOOR = float(audio_vu_level*1.5);
-        }
-    }
-    else{
-        // Subtract noise floor from volume level
-        audio_vu_level -= CONFIG.VU_LEVEL_FLOOR;
-        
-        // Zero out negative volume
-        if(audio_vu_level < 0.0){
-            audio_vu_level = 0.0;
-        }
-       
-        // Normalize volume level
-        audio_vu_level /= (1.0-CONFIG.VU_LEVEL_FLOOR);
-    }
+    // Normalize volume level
+    CONFIG.VU_LEVEL_FLOOR = min(0.99f, CONFIG.VU_LEVEL_FLOOR);
+    audio_vu_level /= (1.0 - CONFIG.VU_LEVEL_FLOOR);
+  }
 
-    // Compute average volume level
-    audio_vu_level_average = (audio_vu_level+audio_vu_level_last) / SQ15x16(2.0);
+  // Compute average volume level
+  audio_vu_level_average = (audio_vu_level + audio_vu_level_last) / (2.0);
 }

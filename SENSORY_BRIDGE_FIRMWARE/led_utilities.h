@@ -68,7 +68,7 @@ CRGB16 hsv(SQ15x16 h, SQ15x16 s, SQ15x16 v) {
 }
 
 void clip_led_values() {
-  for (uint16_t i = 0; i < 128; i++) {
+  for (uint16_t i = 0; i < NATIVE_RESOLUTION; i++) {
     if (leds_16[i].r > (SQ15x16)1.0) {
       leds_16[i].r = (SQ15x16)1.0;
     } else if (leds_16[i].r < (SQ15x16)0.0) {
@@ -107,14 +107,11 @@ void run_sweet_spot() {
   if (sweet_spot_brightness < 1.0) {
     sweet_spot_brightness += 0.05;
   }
-
-  if (sweet_spot_state > sweet_spot_state_follower) {
-    float delta = sweet_spot_state - sweet_spot_state_follower;
-    sweet_spot_state_follower += delta * 0.05;
-  } else if (sweet_spot_state < sweet_spot_state_follower) {
-    float delta = sweet_spot_state_follower - sweet_spot_state;
-    sweet_spot_state_follower -= delta * 0.05;
+  if (sweet_spot_brightness > 1.0) {
+    sweet_spot_brightness = 1.0;
   }
+
+  sweet_spot_state_follower = (sweet_spot_state*0.05) + (sweet_spot_state_follower*0.95);
 
   uint16_t led_power[3] = { 0, 0, 0 };
   for (float i = -1; i <= 1; i++) {
@@ -177,8 +174,8 @@ CRGB lerp_led_NEW(float index, CRGB* led_array) {
   return out_col;
 }
 
-// Returns the linear interpolation of a floating point index in a CRGB array
-// index is in the range of 0.0 - 128.0
+// Returns the linear interpolation of a floating point index in a CRGB16 array
+// index is in the range of 0.0 - float(NATIVE_RESOLUTION)
 CRGB16 lerp_led_16(SQ15x16 index, CRGB16* led_array) {
   int32_t index_whole = index.getInteger();
   SQ15x16 index_fract = index - (SQ15x16)index_whole;
@@ -210,7 +207,7 @@ void apply_brightness() {
 
   SQ15x16 brightness = MASTER_BRIGHTNESS * (CONFIG.PHOTONS * CONFIG.PHOTONS) * silent_scale;
 
-  for (uint16_t i = 0; i < 128; i++) {
+  for (uint16_t i = 0; i < NATIVE_RESOLUTION; i++) {
     leds_16[i].r *= brightness;
     leds_16[i].g *= brightness;
     leds_16[i].b *= brightness;
@@ -710,6 +707,19 @@ void init_leds() {
     }
   }
 
+  else if (CONFIG.LED_TYPE == LED_NEOPIXEL_X2) {
+    if (CONFIG.LED_COLOR_ORDER == RGB) {
+      FastLED.addLeds< WS2812B, LED_DATA_PIN,  RGB >(leds_out, 0, CONFIG.LED_COUNT / 2);
+      FastLED.addLeds< WS2812B, LED_CLOCK_PIN, RGB >(leds_out, CONFIG.LED_COUNT / 2, CONFIG.LED_COUNT / 2);
+    } else if (CONFIG.LED_COLOR_ORDER == GRB) {
+      FastLED.addLeds< WS2812B, LED_DATA_PIN,  GRB >(leds_out, 0, CONFIG.LED_COUNT / 2);
+      FastLED.addLeds< WS2812B, LED_CLOCK_PIN, GRB >(leds_out, CONFIG.LED_COUNT / 2, CONFIG.LED_COUNT / 2);
+    } else if (CONFIG.LED_COLOR_ORDER == BGR) {
+      FastLED.addLeds< WS2812B, LED_DATA_PIN,  BGR >(leds_out, 0, CONFIG.LED_COUNT / 2);
+      FastLED.addLeds< WS2812B, LED_CLOCK_PIN, BGR >(leds_out, CONFIG.LED_COUNT / 2, CONFIG.LED_COUNT / 2);
+    }
+  }
+
   else if (CONFIG.LED_TYPE == LED_DOTSTAR) {
     if (CONFIG.LED_COLOR_ORDER == RGB) {
       FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, RGB>(leds_out, CONFIG.LED_COUNT);
@@ -722,7 +732,7 @@ void init_leds() {
 
   FastLED.setMaxPowerInVoltsAndMilliamps(5.0, CONFIG.MAX_CURRENT_MA);
 
-  for (uint8_t x = 0; x < CONFIG.LED_COUNT; x++) {
+  for (uint16_t x = 0; x < CONFIG.LED_COUNT; x++) {
     leds_out[x] = CRGB(0, 0, 0);
   }
   show_leds();
@@ -904,8 +914,8 @@ void intro_animation() {
 
       float pos = (sin(particles[p].phase * 5) + 1) / 2.0;
       float pos_whole = pos * NATIVE_RESOLUTION;
-      for (uint8_t i = 0; i < NATIVE_RESOLUTION; i++) {
-        float delta = fabs(pos_whole - i);
+      for (uint8_t pix = 0; pix < NATIVE_RESOLUTION; pix++) {
+        float delta = fabs(pos_whole - pix);
         if (delta > 10.0) {
           delta = 10.0;
         }
@@ -915,9 +925,9 @@ void intro_animation() {
         out_col.r *= led_level;
         out_col.g *= led_level;
         out_col.b *= led_level;
-        leds_16[i].r += out_col.r;
-        leds_16[i].g += out_col.g;
-        leds_16[i].b += out_col.b;
+        leds_16[pix].r += out_col.r;
+        leds_16[pix].g += out_col.g;
+        leds_16[pix].b += out_col.b;
       }
     }
     show_leds();
